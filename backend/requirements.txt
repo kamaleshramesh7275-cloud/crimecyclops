@@ -4,5 +4,7 @@ python-multipart==0.0.9
 networkx==3.4.2
 python-dotenv==1.0.1
 aiofiles==23.2.1
+numpy
+sentence-transformers
 
 
