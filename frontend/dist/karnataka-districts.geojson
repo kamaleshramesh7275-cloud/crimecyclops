@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Bengaluru Urban", "name_kn": "ಬೆಂಗಳೂರು ನಗರ", "id": 1 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[77.35, 12.80], [77.85, 12.80], [77.85, 13.20], [77.35, 13.20], [77.35, 12.80]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Mysuru", "name_kn": "ಮೈಸೂರು", "id": 2 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[76.20, 11.90], [76.80, 11.90], [76.80, 12.50], [76.20, 12.50], [76.20, 11.90]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Hubballi-Dharwad", "name_kn": "ಹುಬ್ಬಳ್ಳಿ-ಧಾರವಾಡ", "id": 3 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[74.90, 15.10], [75.30, 15.10], [75.30, 15.50], [74.90, 15.50], [74.90, 15.10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Kalaburagi", "name_kn": "ಕಲಬುರಗಿ", "id": 4 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[76.50, 17.10], [77.10, 17.10], [77.10, 17.60], [76.50, 17.60], [76.50, 17.10]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Mangaluru", "name_kn": "ಮಂಗಳೂರು", "id": 5 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[74.60, 12.50], [75.10, 12.50], [75.10, 13.00], [74.60, 13.00], [74.60, 12.50]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Ballari", "name_kn": "ಬಳ್ಳಾರಿ", "id": 6 },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[76.60, 14.80], [77.10, 14.80], [77.10, 15.30], [76.60, 15.30], [76.60, 14.80]]]
+      }
+    }
+  ]
+}

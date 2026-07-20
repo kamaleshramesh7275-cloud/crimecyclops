@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import StatCard from './components/StatCard';
+import MapAnalysis from './components/MapAnalysis';
+import VoiceControl from './components/VoiceControl';
 
 const AUTH_KEY = 'crimecyclops-session';
 
@@ -77,6 +79,7 @@ function DashboardPage() {
   const [trends, setTrends] = useState<TrendPoint[]>([]);
 
   useEffect(() => {
+    document.title = 'CrimeCyclops | Dashboard';
     Promise.all([
       fetch('/api/dashboard/overview').then((r) => r.json()),
       fetch('/api/dashboard/hotspots').then((r) => r.json()),
@@ -121,15 +124,15 @@ function DashboardPage() {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.7} />
-                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0.1} />
+                  <stop offset="5%" stopColor="#c084fc" stopOpacity={0.7} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
               <XAxis dataKey="name" stroke="#9fb5d5" />
               <YAxis stroke="#9fb5d5" allowDecimals={false} />
               <Tooltip contentStyle={{ background: '#0b172a', border: '1px solid rgba(148, 163, 184, 0.25)' }} />
-              <Area type="monotone" dataKey="count" stroke="#38bdf8" fill="url(#trendFill)" strokeWidth={3} />
+              <Area type="monotone" dataKey="count" stroke="#c084fc" fill="url(#trendFill)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -155,6 +158,7 @@ function PublicPage() {
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
 
   useEffect(() => {
+    document.title = 'CrimeCyclops | Public Safety';
     Promise.all([
       fetch('/api/dashboard/overview').then((r) => r.json()),
       fetch('/api/dashboard/hotspots').then((r) => r.json()),
@@ -199,6 +203,7 @@ function NetworkPage() {
   const [links, setLinks] = useState<NetworkLink[]>([]);
 
   useEffect(() => {
+    document.title = 'CrimeCyclops | Network';
     fetch('/api/network/graph')
       .then((r) => r.json())
       .then((data) => {
@@ -252,6 +257,7 @@ function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
   useEffect(() => {
+    document.title = 'CrimeCyclops | Alerts';
     fetch('/api/alerts')
       .then((r) => r.json())
       .then((data) => setAlerts(data.alerts || []));
@@ -288,6 +294,7 @@ function ReportsPage() {
   const [report, setReport] = useState<ReportSummary | null>(null);
 
   useEffect(() => {
+    document.title = 'CrimeCyclops | Reports';
     fetch('/api/reports/summary')
       .then((r) => r.json())
       .then(setReport);
@@ -323,6 +330,10 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (session: SessionUser
   const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    document.title = 'CrimeCyclops | Sign In';
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -399,6 +410,7 @@ function AppShell({ session, onLogout }: { session: SessionUser | null; onLogout
 
         <nav className="nav-links">
           <NavLink className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/dashboard">{t('dashboard')}</NavLink>
+          <NavLink className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/map">{t('map', 'Map')}</NavLink>
           <NavLink className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/public">{t('public')}</NavLink>
           <NavLink className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/network">{t('network')}</NavLink>
           <NavLink className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/alerts">{t('alerts')}</NavLink>
@@ -415,8 +427,11 @@ function AppShell({ session, onLogout }: { session: SessionUser | null; onLogout
         </div>
       </header>
 
+      <VoiceControl />
+
       <Routes>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/map" element={<MapAnalysis />} />
         <Route path="/public" element={<PublicPage />} />
         <Route path="/network" element={<NetworkPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
