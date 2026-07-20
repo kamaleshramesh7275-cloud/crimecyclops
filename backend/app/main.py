@@ -10,6 +10,9 @@ from app.routers import reports as reports_router
 from app.routers import auth as auth_router
 from app.routers import alerts as alerts_router
 from app.routers import geo as geo_router
+from chatbot.routes import router as chatbot_router
+from chatbot.vectorstore import vector_store_instance
+from chatbot.dataset_loader import load_all_dataset
 import os
 
 app = FastAPI(title="CrimeCyclops", version="1.0.0")
@@ -22,6 +25,10 @@ FRONTEND_DIST = os.path.abspath(
 @app.on_event("startup")
 def startup_event():
     init_db()
+    # Initialize chatbot vector store
+    if not vector_store_instance.load_from_disk():
+        docs = load_all_dataset()
+        vector_store_instance.build_index(docs)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +45,7 @@ app.include_router(reports_router.router, prefix="/api")
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(alerts_router.router, prefix="/api")
 app.include_router(geo_router.router, prefix="/api")
+app.include_router(chatbot_router, prefix="/api")
 
 
 @app.get("/health")

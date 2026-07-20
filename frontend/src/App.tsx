@@ -5,6 +5,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import StatCard from './components/StatCard';
 import MapAnalysis from './components/MapAnalysis';
 import VoiceControl from './components/VoiceControl';
+import { AIChatbot } from './components/AIChatbot';
 
 const AUTH_KEY = 'crimecyclops-session';
 
@@ -347,10 +348,10 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (session: SessionUser
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Unable to sign in.');
+        throw new Error(data?.detail || `Unable to sign in (${response.status}).`);
       }
 
       const session = {
@@ -428,6 +429,7 @@ function AppShell({ session, onLogout }: { session: SessionUser | null; onLogout
       </header>
 
       <VoiceControl />
+      <AIChatbot />
 
       <Routes>
         <Route path="/dashboard" element={<DashboardPage />} />
