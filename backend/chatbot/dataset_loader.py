@@ -38,6 +38,7 @@ def load_sqlite_dataset() -> List[Dict[str, Any]]:
         FROM fir_records f
         LEFT JOIN stations s ON f.station_id = s.id
         LEFT JOIN districts d ON f.district_id = d.id
+        ORDER BY f.incident_date DESC
     """).fetchall()
     
     for row in fir_rows:

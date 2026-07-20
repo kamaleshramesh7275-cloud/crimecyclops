@@ -39,7 +39,7 @@ def generate_grounded_summary(query: str, sources: List[Dict[str, Any]]) -> str:
         details = src.get("details", "").strip()
         if source_name not in seen_sources:
             seen_sources.add(source_name)
-            lines.append(f"### 📋 {source_name}")
+            lines.append(f"### {source_name}")
             lines.append(f"> {details}\n")
             
     lines.append("---")
