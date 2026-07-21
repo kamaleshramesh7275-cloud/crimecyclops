@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from app.database import get_db_connection
 from typing import Optional
+from app.auth_service import get_current_user
 
 router = APIRouter(tags=["geo"])
 
@@ -274,4 +275,60 @@ def get_state_overview():
         "total_stations": stations,
         "top_crimes": [dict(c) for c in top_crimes],
         "monthly_trend": [dict(m) for m in reversed(monthly)],
+    }
+
+
+@router.get("/geo/socio-correlation")
+def socio_correlation(current_user: dict = Depends(get_current_user)):
+    """Expose Pearson correlation coefficients between crime rates and socio-economic markers."""
+    conn = get_db_connection()
+    
+    # Query districts and aggregate counts
+    districts = conn.execute("""
+        SELECT 
+            d.id, d.name, d.population_density, d.literacy_rate, d.unemployment_proxy,
+            COUNT(f.id) as total_firs
+        FROM districts d
+        LEFT JOIN fir_records f ON f.district_id = d.id
+        GROUP BY d.id
+    """).fetchall()
+    conn.close()
+    
+    if len(districts) < 2:
+        return {"correlations": {}, "district_data": []}
+        
+    densities = []
+    literacies = []
+    unemployments = []
+    crime_counts = []
+    
+    for row in districts:
+        densities.append(row["population_density"] or 0.0)
+        literacies.append(row["literacy_rate"] or 0.0)
+        unemployments.append(row["unemployment_proxy"] or 0.0)
+        crime_counts.append(row["total_firs"] or 0)
+        
+    import numpy as np
+    
+    # Compute Pearson Correlation matrix coefficients
+    corr_density = float(np.corrcoef(densities, crime_counts)[0, 1]) if np.std(densities) > 0 and np.std(crime_counts) > 0 else 0.0
+    corr_literacy = float(np.corrcoef(literacies, crime_counts)[0, 1]) if np.std(literacies) > 0 and np.std(crime_counts) > 0 else 0.0
+    corr_unemployment = float(np.corrcoef(unemployments, crime_counts)[0, 1]) if np.std(unemployments) > 0 and np.std(crime_counts) > 0 else 0.0
+    
+    return {
+        "correlations": {
+            "population_density": round(corr_density, 3) if not np.isnan(corr_density) else 0.0,
+            "literacy_rate": round(corr_literacy, 3) if not np.isnan(corr_literacy) else 0.0,
+            "unemployment_rate": round(corr_unemployment, 3) if not np.isnan(corr_unemployment) else 0.0
+        },
+        "district_data": [
+            {
+                "name": r["name"],
+                "total_firs": r["total_firs"],
+                "population_density": r["population_density"],
+                "literacy_rate": r["literacy_rate"],
+                "unemployment_proxy": r["unemployment_proxy"]
+            }
+            for r in districts
+        ]
     }

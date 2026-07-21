@@ -45,6 +45,8 @@ type NetworkNode = {
   degree: number;
   degree_centrality: number;
   betweenness: number;
+  pagerank?: number;
+  community_id?: number;
   
   // Person fields
   age_band?: string;
@@ -395,6 +397,19 @@ function NetworkPage() {
                   <div className="node-metric-value" style={{ color: '#34d399', fontSize: 13 }}>{selectedNode.district || '—'}</div>
                 </div>
               </div>
+
+              {selectedNode.community_id !== undefined && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8, marginTop: 8 }}>
+                  <span style={{ color: '#94a3b8' }}>Gang/Community Cluster</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>#{selectedNode.community_id}</span>
+                </div>
+              )}
+              {selectedNode.pagerank !== undefined && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
+                  <span style={{ color: '#94a3b8' }}>PageRank Influence</span>
+                  <span style={{ color: '#a78bfa', fontWeight: 'bold' }}>{(selectedNode.pagerank * 100).toFixed(2)}%</span>
+                </div>
+              )}
               <button
                 onClick={() => setSelectedNode(null)}
                 style={{
