@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import StatCard from './components/StatCard';
 import MapAnalysis from './components/MapAnalysis';
 import VoiceControl from './components/VoiceControl';
@@ -139,83 +139,249 @@ function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   return fetch(url, { ...options, headers });
 }
 
+// ── types for new dashboard panels ──────────────────────────────
+type DashOverview = Overview & {
+  closed_cases: number;
+  closure_rate_pct: number;
+  avg_resolution_days: number;
+};
+type CrimeCategory = { crime_type: string; count: number; percentage: number; color: string };
+type DistrictRow = {
+  rank: number; district_name: string; total_firs: number;
+  open_cases: number; open_rate_pct: number; open_rate_color: string;
+};
+type RecentFIR = {
+  id: number; crime_type: string; status: string;
+  incident_date: string; district_name: string; station_name: string;
+};
+type TrendSeries = Record<string, number> & { month: string };
+type AnomalyItem = { district: string; year_week: string; count: number; deviation: number; anomaly_score: number };
+type RiskGrid = { latitude: number; longitude: number; risk_score: number };
+
+const CHART_COLORS = ['#c084fc','#38bdf8','#34d399','#fb7185','#fbbf24','#f97316'];
+
 function DashboardPage() {
   const { t } = useTranslation();
-  const [overview, setOverview] = useState<Overview>({ total_firs: 0, total_stations: 0, total_districts: 0, open_cases: 0 });
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-  const [trends, setTrends] = useState<TrendPoint[]>([]);
+  const [overview,    setOverview]    = useState<DashOverview>({ total_firs:0, total_stations:0, total_districts:0, open_cases:0, closed_cases:0, closure_rate_pct:0, avg_resolution_days:0 });
+  const [categories,  setCategories]  = useState<CrimeCategory[]>([]);
+  const [trendSeries, setTrendSeries] = useState<TrendSeries[]>([]);
+  const [topTypes,    setTopTypes]    = useState<string[]>([]);
+  const [districts,   setDistricts]   = useState<DistrictRow[]>([]);
+  const [recent,      setRecent]      = useState<RecentFIR[]>([]);
+  const [anomalies,   setAnomalies]   = useState<AnomalyItem[]>([]);
+  const [riskData,    setRiskData]    = useState<{ predicted_next_month_volume: number; grid: RiskGrid[] } | null>(null);
+  const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Dashboard';
     Promise.all([
-      authFetch('/api/dashboard/overview').then((r) => r.json()),
-      authFetch('/api/dashboard/hotspots').then((r) => r.json()),
-      authFetch('/api/dashboard/trends').then((r) => r.json()),
-    ]).then(([overviewData, hotspotsData, trendsData]) => {
-      setOverview(overviewData);
-      setHotspots(hotspotsData.hotspots || []);
-      setTrends(trendsData.data || []);
-    });
+      authFetch('/api/dashboard/overview').then(r => r.json()),
+      authFetch('/api/dashboard/crime-categories').then(r => r.json()),
+      authFetch('/api/dashboard/trends').then(r => r.json()),
+      authFetch('/api/dashboard/district-summary').then(r => r.json()),
+      authFetch('/api/dashboard/recent-activity').then(r => r.json()),
+      authFetch('/api/analytics/anomalies').then(r => r.json()),
+      authFetch('/api/analytics/predictive-risk').then(r => r.json()),
+    ]).then(([ov, cats, tr, dist, rec, anom, risk]) => {
+      setOverview(ov);
+      setCategories(cats.categories || []);
+      setTrendSeries(tr.data || []);
+      setTopTypes(tr.top_types || []);
+      setDistricts(dist.districts || []);
+      setRecent(rec.recent || []);
+      setAnomalies((anom.anomalies || []).slice(0, 5));
+      setRiskData(risk);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
-  const chartData = useMemo(
-    () =>
-      trends.map((item) => ({
-        name: item.incident_date,
-        count: item.count,
-        type: item.crime_type,
-      })),
-    [trends],
-  );
+  const rankClass = (r: number) => r === 1 ? 'gold' : r === 2 ? 'silver' : r === 3 ? 'bronze' : 'plain';
+  const statusClass = (s: string) => ['open','closed','investigation'].includes(s) ? s : 'default';
+  const statusDot   = (s: string) => s === 'open' ? '#fb7185' : s === 'closed' ? '#34d399' : '#fbbf24';
+  const riskClass   = (score: number) => score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
+  const tooltipStyle = { background: '#0b172a', border: '1px solid rgba(148,163,184,0.25)', borderRadius: 8, fontSize: 12 };
 
   return (
     <div className="page">
-      <section className="hero-card">
+      {/* ── HERO BANNER ── */}
+      <section className="hero-card" style={{ marginBottom: 24 }}>
         <h1 className="hero-title">CrimeCyclops Intelligence Command</h1>
         <p className="hero-subtitle">
           Unified incident visibility for investigators, district officers, and public-facing safety response teams.
         </p>
       </section>
 
-      <div className="stat-grid">
-        <StatCard title={t('overview')} value={overview.total_firs} accent="#c084fc" />
-        <StatCard title="Districts" value={overview.total_districts} accent="#38bdf8" />
-        <StatCard title="Stations" value={overview.total_stations} accent="#34d399" />
-        <StatCard title="Open Cases" value={overview.open_cases} accent="#fb7185" />
+      {/* ── KPI ROW ── */}
+      <div className="kpi-grid">
+        <div className="kpi-card" style={{ '--kpi-accent': '#c084fc' } as React.CSSProperties}>
+          <div className="kpi-label">Total FIRs</div>
+          <div className="kpi-value">{overview.total_firs.toLocaleString()}</div>
+          <span className="kpi-delta neutral">All Time</span>
+        </div>
+        <div className="kpi-card" style={{ '--kpi-accent': '#34d399' } as React.CSSProperties}>
+          <div className="kpi-label">Closure Rate</div>
+          <div className="kpi-value">{overview.closure_rate_pct}%</div>
+          <span className={`kpi-delta ${overview.closure_rate_pct >= 60 ? 'up' : 'down'}`}>
+            {overview.closure_rate_pct >= 60 ? '↑ On Track' : '↓ Below Target'}
+          </span>
+        </div>
+        <div className="kpi-card" style={{ '--kpi-accent': '#38bdf8' } as React.CSSProperties}>
+          <div className="kpi-label">Avg Resolution</div>
+          <div className="kpi-value">{overview.avg_resolution_days}<span style={{ fontSize:'1rem', color:'#9fb5d5', marginLeft:4 }}>days</span></div>
+          <span className={`kpi-delta ${overview.avg_resolution_days <= 30 ? 'up' : 'down'}`}>
+            {overview.avg_resolution_days <= 30 ? '↑ Fast' : '↓ Slow'}
+          </span>
+        </div>
+        <div className="kpi-card" style={{ '--kpi-accent': '#fb7185' } as React.CSSProperties}>
+          <div className="kpi-label">Open Cases</div>
+          <div className="kpi-value">{overview.open_cases.toLocaleString()}</div>
+          <span className="kpi-delta down">Needs Attention</span>
+        </div>
+        <div className="kpi-card" style={{ '--kpi-accent': '#fbbf24' } as React.CSSProperties}>
+          <div className="kpi-label">Districts</div>
+          <div className="kpi-value">{overview.total_districts}</div>
+          <span className="kpi-delta neutral">{overview.total_stations} Stations</span>
+        </div>
       </div>
 
-      <section className="panel list-card chart-card">
-        <h3>Incident Trend View</h3>
-        <div className="chart-wrap">
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#c084fc" stopOpacity={0.7} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-              <XAxis dataKey="name" stroke="#9fb5d5" />
-              <YAxis stroke="#9fb5d5" allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#0b172a', border: '1px solid rgba(148, 163, 184, 0.25)' }} />
-              <Area type="monotone" dataKey="count" stroke="#c084fc" fill="url(#trendFill)" strokeWidth={3} />
-            </AreaChart>
+      {/* ── TREND + CRIME CATEGORIES ── */}
+      <div className="dash-row wide-left" style={{ marginBottom: 20 }}>
+        <div className="dash-panel">
+          <h3 className="dash-panel-title">Monthly Crime Trends (Top Types)</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={trendSeries}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" />
+              <XAxis dataKey="month" stroke="#9fb5d5" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#9fb5d5" tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ fontSize: 11, color: '#9fb5d5' }} />
+              {topTypes.map((type, i) => (
+                <Line key={type} type="monotone" dataKey={type} stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                  strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         </div>
-      </section>
 
-      <section className="panel list-card">
-        <h3>{t('hotspots')}</h3>
-        <ul className="hotspot-list">
-          {hotspots.map((item) => (
-            <li key={item.station_id}>
-              <strong>Station {item.station_id}</strong>
-              <span>{item.count} incidents</span>
-            </li>
+        <div className="dash-panel">
+          <h3 className="dash-panel-title">Crime Category Breakdown</h3>
+          <div style={{ marginBottom: 12 }}>
+            <ResponsiveContainer width="100%" height={140}>
+              <PieChart>
+                <Pie data={categories} dataKey="count" nameKey="crime_type" cx="50%" cy="50%"
+                  innerRadius={40} outerRadius={65} paddingAngle={3}>
+                  {categories.map((cat, i) => <Cell key={i} fill={cat.color} />)}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n: string) => [`${v} cases`, n]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {categories.slice(0, 6).map(cat => (
+            <div key={cat.crime_type} className="crime-bar-row">
+              <div className="crime-bar-label" title={cat.crime_type}>{cat.crime_type}</div>
+              <div className="crime-bar-track">
+                <div className="crime-bar-fill" style={{ width: `${cat.percentage}%`, background: cat.color }} />
+              </div>
+              <div className="crime-bar-count">{cat.count.toLocaleString()}</div>
+            </div>
           ))}
-        </ul>
-      </section>
+        </div>
+      </div>
+
+      {/* ── DISTRICT LEADERBOARD + ANOMALY FEED ── */}
+      <div className="dash-row" style={{ marginBottom: 20 }}>
+        <div className="dash-panel">
+          <h3 className="dash-panel-title">District Leaderboard</h3>
+          <table className="district-table">
+            <thead>
+              <tr>
+                <th>#</th><th>District</th><th>Total FIRs</th><th>Open Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {districts.map(d => (
+                <tr key={d.rank}>
+                  <td><span className={`rank-badge ${rankClass(d.rank)}`}>{d.rank}</span></td>
+                  <td style={{ fontWeight: 600 }}>{d.district_name}</td>
+                  <td>{d.total_firs.toLocaleString()}</td>
+                  <td>
+                    <span className="open-rate-pill" style={{
+                      background: `${d.open_rate_color}22`,
+                      color: d.open_rate_color
+                    }}>
+                      {d.open_rate_pct}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="dash-panel">
+          <h3 className="dash-panel-title">ML Anomaly Detection</h3>
+          {loading ? (
+            <p style={{ color: '#9fb5d5', fontSize: '0.82rem' }}>Running Isolation Forest analysis...</p>
+          ) : anomalies.length === 0 ? (
+            <p style={{ color: '#34d399', fontSize: '0.82rem' }}>No anomalies detected in recent data.</p>
+          ) : (
+            anomalies.map((a, i) => (
+              <div key={i} className="anomaly-item">
+                <div className="anomaly-dot" />
+                <div>
+                  <div className="anomaly-district">{a.district}</div>
+                  <div className="anomaly-week">Week: {a.year_week} · {a.count} cases</div>
+                  <div className="anomaly-deviation">
+                    {a.deviation > 0 ? `+${a.deviation}%` : `${a.deviation}%`} vs district avg · Score: {a.anomaly_score.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          <div style={{ marginTop: 20 }}>
+            <h3 className="dash-panel-title" style={{ marginBottom: 12 }}>Predictive Risk</h3>
+            {riskData && (
+              <>
+                <div className="risk-predicted-banner">
+                  <div>
+                    <div className="risk-predicted-label">Predicted Next-Month Volume</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>Linear trend projection</div>
+                  </div>
+                  <div className="risk-predicted-value">{riskData.predicted_next_month_volume?.toLocaleString()}</div>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#9fb5d5', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Top Risk Sectors
+                </div>
+                {riskData.grid.slice(0, 5).map((g, i) => (
+                  <div key={i} className="risk-row">
+                    <span style={{ color: '#9fb5d5', fontSize: '0.76rem' }}>
+                      {g.latitude.toFixed(2)}°N, {g.longitude.toFixed(2)}°E
+                    </span>
+                    <span className={`risk-score-pill ${riskClass(g.risk_score)}`}>{g.risk_score.toFixed(1)}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── RECENT ACTIVITY TICKER ── */}
+      <div className="dash-panel" style={{ marginBottom: 20 }}>
+        <h3 className="dash-panel-title">Recent FIR Activity</h3>
+        <div className="activity-ticker">
+          {recent.map((fir, i) => (
+            <div key={fir.id || i} className="activity-item">
+              <div className="activity-status-dot" style={{ background: statusDot(fir.status) }} />
+              <div className="activity-type">{fir.crime_type}</div>
+              <div className="activity-district">{fir.district_name || '—'}</div>
+              <div className="activity-date">{fir.incident_date?.slice(0, 10) || '—'}</div>
+              <span className={`status-pill-sm ${statusClass(fir.status)}`}>{fir.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -269,12 +435,12 @@ function PublicPage() {
           {/* Section 1: Helplines */}
           <section className="panel" style={{ background: 'rgba(20, 15, 42, 0.4)' }}>
             <h3 style={{ margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>📞</span> Emergency Helplines & SOS Quick Directory
+              Emergency Helplines & SOS Quick Directory
             </h3>
             <div className="helpline-grid">
               {safetyData.helplines.map((h, i) => (
                 <div key={i} className="helpline-card">
-                  <div className="helpline-icon">{h.icon}</div>
+                  <div className="helpline-icon" style={{ fontSize: 13, color: '#9fb5d5', fontWeight: 600 }}>{h.category.slice(0,2).toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>{h.category}</div>
                     <div style={{ fontWeight: 600, fontSize: 14, color: '#f8fafc' }}>{h.name}</div>
@@ -344,7 +510,7 @@ function PublicPage() {
 
             {/* Section 3: Advisories */}
             <section className="panel">
-              <h3 style={{ marginBottom: 14 }}>⚠️ Public Safety Bulletins & Alerts</h3>
+              <h3 style={{ marginBottom: 14 }}>Public Safety Bulletins & Alerts</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {safetyData.advisories.map((a) => (
                   <div key={a.id} className="advisory-card" style={{ borderLeft: a.severity === 'high' ? '4px solid #fb7185' : '4px solid #fbbf24' }}>
@@ -360,7 +526,7 @@ function PublicPage() {
                       className="chip-button"
                       style={{ padding: '4px 8px', fontSize: 11 }}
                     >
-                      {selectedAdvisory === a.id ? 'Hide Prevention Tips' : 'View Prevention Tips 👇'}
+                      {selectedAdvisory === a.id ? 'Hide Prevention Tips' : 'View Prevention Tips'}
                     </button>
 
                     {selectedAdvisory === a.id && (
@@ -568,7 +734,7 @@ function NetworkPage() {
                   background: 'rgba(192,132,252,0.1)', border: '1px solid rgba(192,132,252,0.25)',
                   color: '#c084fc', cursor: 'pointer', fontSize: 12
                 }}
-              >✕ Dismiss</button>
+              >Dismiss</button>
             </div>
           )}
 
@@ -730,8 +896,8 @@ function AlertsPage() {
                   {item.crime_category && <span> • <strong>Category:</strong> {item.crime_category}</span>}
                 </div>
                 <div style={{ fontSize: 13, color: '#e2e8f0', lineHeight: 1.4, marginTop: 4 }}>{item.message}</div>
-                <div style={{ fontSize: 11, color: '#38bdf8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                  <span>🚀</span> Click to initiate field team dispatch
+                <div style={{ fontSize: 11, color: '#38bdf8', fontStyle: 'italic', marginTop: 4 }}>
+                  Click to initiate field team dispatch
                 </div>
               </li>
             ))}
@@ -814,7 +980,7 @@ function ReportsPage() {
           onClick={() => setBriefingOpen(true)}
           style={{ padding: '10px 20px', fontSize: 14, alignSelf: 'center' }}
         >
-          📄 Print / View Executive Briefing
+          Print / View Executive Briefing
         </button>
       </section>
 
@@ -851,7 +1017,7 @@ function ReportsPage() {
               <ul className="hotspot-list" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {report.summary.map((item, index) => (
                   <li key={`${item}-${index}`} style={{ background: 'rgba(30, 41, 59, 0.25)', padding: 12, borderRadius: 8, fontSize: 13, color: '#e2e8f0', listStyle: 'none' }}>
-                    🔹 {item}
+                    {item}
                   </li>
                 ))}
               </ul>
@@ -896,7 +1062,7 @@ function ReportsPage() {
                 <tbody>
                   {report.overloaded_investigators.map((o, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>👤 {o.name}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>{o.name}</td>
                       <td style={{ padding: '10px 12px' }}>{o.station}</td>
                       <td style={{ padding: '10px 12px' }}>{o.district}</td>
                       <td style={{ padding: '10px 12px', color: '#fb7185', fontWeight: 'bold' }}>{o.workload} active cases</td>

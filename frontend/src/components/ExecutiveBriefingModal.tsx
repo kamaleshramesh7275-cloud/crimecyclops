@@ -26,9 +26,9 @@ export const ExecutiveBriefingModal: React.FC<ExecutiveBriefingModalProps> = ({ 
                 win?.focus();
               }}
             >
-              🖨️ Open Printable Tab
+              Open Printable Tab
             </button>
-            <button className="close-btn" onClick={onClose}>✕</button>
+            <button className="close-btn" onClick={onClose}>x</button>
           </div>
         </div>
 

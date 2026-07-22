@@ -85,7 +85,7 @@ export const AlertDispatchModal: React.FC<AlertDispatchModalProps> = ({ alert, o
             </div>
             <h3 style={{ margin: '4px 0 0 0', color: '#f8fafc', fontSize: 18 }}>{alert.id}: {alert.district}</h3>
           </div>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className="close-btn" onClick={onClose}>x</button>
         </div>
 
         <div className="modal-body" style={{ marginTop: 16 }}>
@@ -97,7 +97,7 @@ export const AlertDispatchModal: React.FC<AlertDispatchModalProps> = ({ alert, o
             <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0', lineHeight: 1.4 }}>{alert.message}</p>
             {alert.recommended_action && (
               <div style={{ marginTop: 8, fontSize: 12, color: '#38bdf8' }}>
-                💡 <strong>Action:</strong> {alert.recommended_action}
+                <strong>Action:</strong> {alert.recommended_action}
               </div>
             )}
           </div>
@@ -111,14 +111,14 @@ export const AlertDispatchModal: React.FC<AlertDispatchModalProps> = ({ alert, o
                   className={`chip-button ${channel === 'sms' ? 'active' : ''}`}
                   onClick={() => { setChannel('sms'); setRecipient('+91 94808 01100'); }}
                 >
-                  📱 SMS Dispatch
+                  SMS Dispatch
                 </button>
                 <button
                   type="button"
                   className={`chip-button ${channel === 'email' ? 'active' : ''}`}
                   onClick={() => { setChannel('email'); setRecipient('sp-command@ksp.gov.in'); }}
                 >
-                  ✉️ Official Email
+                  Official Email
                 </button>
               </div>
             </div>
@@ -159,7 +159,7 @@ export const AlertDispatchModal: React.FC<AlertDispatchModalProps> = ({ alert, o
             <div style={{ display: 'flex', justifySelf: 'flex-end', gap: 10 }}>
               <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
               <button type="submit" className="primary-button" disabled={sending}>
-                {sending ? 'Dispatching...' : `🚀 Send ${channel.toUpperCase()} Alert`}
+                {sending ? 'Dispatching...' : `Send ${channel.toUpperCase()} Alert`}
               </button>
             </div>
           </form>

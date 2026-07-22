@@ -348,7 +348,7 @@ export const AIChatbot: React.FC = () => {
                               setShowSourcesForMsg(showSourcesForMsg === msg.id ? null : msg.id)
                             }
                           >
-                            📚 {msg.sources.length} Grounded Sources{' '}
+                            {msg.sources.length} Grounded Sources{' '}
                             {showSourcesForMsg === msg.id ? '▲' : '▼'}
                           </button>
 
@@ -357,7 +357,7 @@ export const AIChatbot: React.FC = () => {
                               {msg.sources.map((src, i) => (
                                 <div key={i} className="source-card">
                                   <div className="source-header">
-                                    <span className="source-name">📌 {src.source}</span>
+                                    <span className="source-name">{src.source}</span>
                                     <span className="source-score">
                                       Score: {(src.similarity_score * 100).toFixed(0)}%
                                     </span>
@@ -392,7 +392,7 @@ export const AIChatbot: React.FC = () => {
               {/* Suggested Questions */}
               {messages.length < 5 && !loading && (
                 <div className="suggested-chips">
-                  <span className="chips-label">💡 Suggested Queries:</span>
+                  <span className="chips-label">Suggested Queries:</span>
                   <div className="chips-scroll">
                     {SUGGESTED_QUESTIONS.map((q, idx) => (
                       <button key={idx} className="chip-btn" onClick={() => sendMessage(q)}>
