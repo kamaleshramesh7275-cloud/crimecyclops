@@ -4,25 +4,29 @@ from typing import List, Optional
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 import jwt
-from jwt.exceptions import PyJWTError
-from passlib.context import CryptContext
 from app.database import get_db_connection
+
 
 # Load configurations from environment
 SECRET_KEY = os.getenv("JWT_SECRET", "4d9c73e0a29b4e8c8a14d59fcf82e9b11d9f8c858be16cb4d142d76a7e02b3c2")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720")) # Default 12 hours
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+import bcrypt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        if hashed_password and (hashed_password.startswith("$2a$") or hashed_password.startswith("$2b$") or hashed_password.startswith("$2y$")):
+            return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+        return plain_password == hashed_password
+    except Exception:
+        return plain_password == hashed_password
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

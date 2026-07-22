@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import sqlite3
-from passlib.hash import bcrypt
+import bcrypt
 
 DB_PATH = Path(__file__).resolve().parents[1] / "crimecyclops.db"
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -172,7 +172,7 @@ def init_postgres():
     # Insert default admin user if not exists
     cur.execute("SELECT 1 FROM users WHERE username = 'admin';")
     if not cur.fetchone():
-        hashed_password = bcrypt.hash("admin123")
+        hashed_password = bcrypt.hashpw(b"admin123", bcrypt.gensalt()).decode("utf-8")
         cur.execute(
             "INSERT INTO users (username, role, password) VALUES (%s, %s, %s);",
             ("admin", "admin", hashed_password)
@@ -301,7 +301,7 @@ def init_sqlite():
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM users WHERE username = 'admin';")
     if not cur.fetchone():
-        hashed_password = bcrypt.hash("admin123")
+        hashed_password = bcrypt.hashpw(b"admin123", bcrypt.gensalt()).decode("utf-8")
         cur.execute(
             "INSERT INTO users (username, role, password) VALUES (?, ?, ?);",
             ("admin", "admin", hashed_password)

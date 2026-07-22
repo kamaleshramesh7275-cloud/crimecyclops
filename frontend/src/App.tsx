@@ -1,12 +1,15 @@
 import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import StatCard from './components/StatCard';
 import MapAnalysis from './components/MapAnalysis';
 import VoiceControl from './components/VoiceControl';
 import { AIChatbot } from './components/AIChatbot';
 import NetworkGraph from './components/NetworkGraph';
+import { AlertDispatchModal } from './components/AlertDispatchModal';
+import { ExecutiveBriefingModal } from './components/ExecutiveBriefingModal';
+
 
 const AUTH_KEY = 'crimecyclops-session';
 
@@ -82,17 +85,32 @@ type NetworkStats = {
 };
 
 type AlertItem = {
+  id: string;
   type: string;
   district: string;
   severity: string;
+  timestamp: string;
+  crime_category?: string;
   message: string;
+  recommended_action?: string;
+  status: string;
 };
 
 type ReportSummary = {
   report_type: string;
-  district: string;
+  aging_stats: {
+    under_30_days: number;
+    "30_to_90_days": number;
+    stagnant_over_90_days: number;
+  };
+  aging_chart_data: { category: string; cases: number; fill: string }[];
+  crime_distribution: { crime_type: string; count: number }[];
+  average_workload: number;
+  overloaded_investigators: { name: string; station: string; district: string; workload: number }[];
   summary: string[];
+  districts: { id: number; name: string }[];
 };
+
 
 function getStoredSession(): SessionUser | null {
   const raw = localStorage.getItem(AUTH_KEY);
@@ -108,6 +126,19 @@ function getStoredSession(): SessionUser | null {
   }
 }
 
+/** Fetch with automatic JWT Bearer token from stored session. */
+function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const session = getStoredSession();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+  if (session?.token) {
+    headers['Authorization'] = `Bearer ${session.token}`;
+  }
+  return fetch(url, { ...options, headers });
+}
+
 function DashboardPage() {
   const { t } = useTranslation();
   const [overview, setOverview] = useState<Overview>({ total_firs: 0, total_stations: 0, total_districts: 0, open_cases: 0 });
@@ -117,9 +148,9 @@ function DashboardPage() {
   useEffect(() => {
     document.title = 'CrimeCyclops | Dashboard';
     Promise.all([
-      fetch('/api/dashboard/overview').then((r) => r.json()),
-      fetch('/api/dashboard/hotspots').then((r) => r.json()),
-      fetch('/api/dashboard/trends').then((r) => r.json()),
+      authFetch('/api/dashboard/overview').then((r) => r.json()),
+      authFetch('/api/dashboard/hotspots').then((r) => r.json()),
+      authFetch('/api/dashboard/trends').then((r) => r.json()),
     ]).then(([overviewData, hotspotsData, trendsData]) => {
       setOverview(overviewData);
       setHotspots(hotspotsData.hotspots || []);
@@ -190,49 +221,169 @@ function DashboardPage() {
 }
 
 function PublicPage() {
-  const [overview, setOverview] = useState<Overview>({ total_firs: 0, total_stations: 0, total_districts: 0, open_cases: 0 });
-  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [safetyData, setSafetyData] = useState<{
+    district_safety_scores: {
+      district_id: number;
+      district_name: string;
+      safety_score: number;
+      grade: string;
+      status: string;
+      color: string;
+      total_incidents: number;
+      resolution_rate_pct: number;
+      literacy_rate_pct: number;
+    }[];
+    helplines: { name: string; number: string; category: string; icon: string }[];
+    advisories: { id: string; title: string; category: string; severity: string; date: string; summary: string; tips: string[] }[];
+  } | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAdvisory, setSelectedAdvisory] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Public Safety';
-    Promise.all([
-      fetch('/api/dashboard/overview').then((r) => r.json()),
-      fetch('/api/dashboard/hotspots').then((r) => r.json()),
-    ]).then(([overviewData, hotspotsData]) => {
-      setOverview(overviewData);
-      setHotspots(hotspotsData.hotspots || []);
-    });
+    authFetch('/api/public/safety-index')
+      .then((r) => r.json())
+      .then(setSafetyData);
   }, []);
+
+  const filteredDistricts = useMemo(() => {
+    if (!safetyData) return [];
+    return safetyData.district_safety_scores.filter((d) =>
+      d.district_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [safetyData, searchQuery]);
 
   return (
     <div className="page">
       <section className="hero-card">
-        <h1 className="hero-title">Citizen Safety Snapshot</h1>
+        <h1 className="hero-title">Citizen Safety Portal & Public Advisories</h1>
         <p className="hero-subtitle">
-          Aggregate-only hotspot summary for public visibility, optimised for transparency and rapid awareness.
+          Real-time District Safety Index (DSI) scorecard, active public safety bulletins, and official helpline access.
         </p>
       </section>
 
-      <div className="stat-grid">
-        <StatCard title="FIRs" value={overview.total_firs} />
-        <StatCard title="Districts" value={overview.total_districts} />
-        <StatCard title="Stations" value={overview.total_stations} />
-      </div>
+      {safetyData ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+          
+          {/* Section 1: Helplines */}
+          <section className="panel" style={{ background: 'rgba(20, 15, 42, 0.4)' }}>
+            <h3 style={{ margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📞</span> Emergency Helplines & SOS Quick Directory
+            </h3>
+            <div className="helpline-grid">
+              {safetyData.helplines.map((h, i) => (
+                <div key={i} className="helpline-card">
+                  <div className="helpline-icon">{h.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{h.category}</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#f8fafc' }}>{h.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 4 }}>
+                      <span style={{ fontSize: 16, color: '#38bdf8', fontWeight: 'bold' }}>{h.number}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(h.number);
+                          alert(`Copied number: ${h.number}`);
+                        }}
+                        style={{
+                          background: 'none', border: 'none', color: '#c084fc', cursor: 'pointer', fontSize: 11, padding: 0
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-      <section className="panel list-card">
-        <h3>Public hotspot distribution</h3>
-        <ul className="hotspot-list">
-          {hotspots.slice(0, 6).map((item) => (
-            <li key={item.station_id}>
-              <strong>Station {item.station_id}</strong>
-              <span>{item.count} detected incidents</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+            
+            {/* Section 2: District Safety Index */}
+            <section className="panel list-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0 }}>District Safety Scorecard</h3>
+                <input
+                  type="text"
+                  placeholder="Filter by district..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(148,163,184,0.2)',
+                    color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 12, outline: 'none'
+                  }}
+                />
+              </div>
+              <div className="dsi-grid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredDistricts.map((d) => (
+                  <div
+                    key={d.district_id}
+                    className="dsi-card"
+                    style={{
+                      flexDirection: 'row', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: 'rgba(30, 41, 59, 0.25)', borderLeft: `4px solid ${d.color}`, padding: '10px 14px'
+                    }}
+                  >
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: 15, color: '#f8fafc' }}>{d.district_name}</h4>
+                      <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#94a3b8' }}>
+                        {d.total_incidents} registered cases • {d.resolution_rate_pct}% resolved
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 'bold', color: d.color }}>{d.grade}</div>
+                        <div style={{ fontSize: 10, color: '#64748b' }}>Index: {d.safety_score}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Section 3: Advisories */}
+            <section className="panel">
+              <h3 style={{ marginBottom: 14 }}>⚠️ Public Safety Bulletins & Alerts</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {safetyData.advisories.map((a) => (
+                  <div key={a.id} className="advisory-card" style={{ borderLeft: a.severity === 'high' ? '4px solid #fb7185' : '4px solid #fbbf24' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span className={`severity-badge severity-${a.severity}`} style={{ fontSize: 9 }}>{a.severity.toUpperCase()}</span>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>{a.date}</span>
+                    </div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#f8fafc', fontSize: 14 }}>{a.title}</h4>
+                    <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#dce8ff', lineHeight: 1.4 }}>{a.summary}</p>
+                    
+                    <button
+                      onClick={() => setSelectedAdvisory(selectedAdvisory === a.id ? null : a.id)}
+                      className="chip-button"
+                      style={{ padding: '4px 8px', fontSize: 11 }}
+                    >
+                      {selectedAdvisory === a.id ? 'Hide Prevention Tips' : 'View Prevention Tips 👇'}
+                    </button>
+
+                    {selectedAdvisory === a.id && (
+                      <ul style={{ margin: '10px 0 0 0', paddingLeft: 18, fontSize: 12, color: '#38bdf8', lineHeight: 1.5 }}>
+                        {a.tips.map((tip, idx) => (
+                          <li key={idx} style={{ marginBottom: 4 }}>{tip}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>Loading safety metrics...</div>
+      )}
     </div>
   );
 }
+
 
 function NetworkPage() {
   const [nodes, setNodes] = useState<NetworkNode[]>([]);
@@ -244,7 +395,7 @@ function NetworkPage() {
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Network';
-    fetch('/api/network/graph')
+    authFetch('/api/network/graph')
       .then((r) => r.json())
       .then((data) => {
         setNodes(data.nodes || []);
@@ -468,71 +619,315 @@ function NetworkPage() {
 
 function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [dispatchHistory, setDispatchHistory] = useState<any[]>([]);
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [searchDistrict, setSearchDistrict] = useState<string>('');
+  const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
+
+  const fetchAlerts = () => {
+    authFetch('/api/alerts')
+      .then((r) => r.json())
+      .then((data) => {
+        setAlerts(data.alerts || []);
+        setDispatchHistory(data.dispatch_history || []);
+      });
+  };
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Alerts';
-    fetch('/api/alerts')
-      .then((r) => r.json())
-      .then((data) => setAlerts(data.alerts || []));
+    fetchAlerts();
   }, []);
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((item) => {
+      const matchSeverity = filterSeverity === 'all' || item.severity.toLowerCase() === filterSeverity.toLowerCase();
+      const matchType = filterType === 'all' || item.type.toLowerCase() === filterType.toLowerCase();
+      const matchDistrict = !searchDistrict || item.district.toLowerCase().includes(searchDistrict.toLowerCase());
+      return matchSeverity && matchType && matchDistrict;
+    });
+  }, [alerts, filterSeverity, filterType, searchDistrict]);
 
   return (
     <div className="page">
       <section className="hero-card">
-        <h1 className="hero-title">Alerts</h1>
+        <h1 className="hero-title">Incident Alert & Dispatch Hub</h1>
         <p className="hero-subtitle">
-          Dedicated anomaly and escalation queue with a structured handoff path for critical incidents.
+          Real-time anomaly queues, threshold breach alerts, and official SMS/Email dispatch controls for field units.
         </p>
       </section>
 
-      <section className="panel list-card">
-        <h3>Priority queue</h3>
-        <ul className="hotspot-list">
-          {alerts.map((item, index) => (
-            <li key={`${item.district}-${index}`}>
-              <strong>{item.type.toUpperCase()}</strong>
-              <span>
-                {item.district} • {item.severity}
-              </span>
-              <div>{item.message}</div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
+        
+        {/* Alerts List panel */}
+        <section className="panel list-card">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}>Active Alert Queue ({filteredAlerts.length})</h3>
+            
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Search district..."
+                value={searchDistrict}
+                onChange={(e) => setSearchDistrict(e.target.value)}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(148,163,184,0.2)',
+                  color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 12, outline: 'none', flex: 1
+                }}
+              />
+              <select
+                value={filterSeverity}
+                onChange={(e) => setFilterSeverity(e.target.value)}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(148,163,184,0.2)',
+                  color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 12, outline: 'none'
+                }}
+              >
+                <option value="all">All Severities</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(148,163,184,0.2)',
+                  color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 12, outline: 'none'
+                }}
+              >
+                <option value="all">All Types</option>
+                <option value="spike_detected">Spikes</option>
+                <option value="hotspot_escalation">Hotspots</option>
+                <option value="anomaly">Anomalies</option>
+                <option value="realtime_spike">Realtime Surge</option>
+              </select>
+            </div>
+          </div>
+
+          <ul className="hotspot-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {filteredAlerts.map((item, index) => (
+              <li
+                key={`${item.id}-${index}`}
+                style={{
+                  cursor: 'pointer', background: 'rgba(30, 41, 59, 0.3)', padding: 14, borderRadius: 10,
+                  border: '1px solid rgba(148,163,184,0.15)', listStyle: 'none', transition: 'all 0.2s ease',
+                  display: 'flex', flexDirection: 'column', gap: 6
+                }}
+                onClick={() => setSelectedAlert(item)}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(192, 132, 252, 0.5)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className={`severity-badge severity-${item.severity}`}>{item.severity}</span>
+                    <strong style={{ fontSize: 13, color: '#f8fafc' }}>{item.district}</strong>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>{item.timestamp}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                  <strong>Type:</strong> <span style={{ textTransform: 'capitalize' }}>{item.type.replace('_', ' ')}</span>
+                  {item.crime_category && <span> • <strong>Category:</strong> {item.crime_category}</span>}
+                </div>
+                <div style={{ fontSize: 13, color: '#e2e8f0', lineHeight: 1.4, marginTop: 4 }}>{item.message}</div>
+                <div style={{ fontSize: 11, color: '#38bdf8', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <span>🚀</span> Click to initiate field team dispatch
+                </div>
+              </li>
+            ))}
+            {filteredAlerts.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>No alerts match your filter criteria.</div>
+            )}
+          </ul>
+        </section>
+
+        {/* Dispatch History panel */}
+        <section className="panel list-card">
+          <h3 style={{ marginBottom: 14 }}>Official Dispatch Logs</h3>
+          <ul style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 0, margin: 0 }}>
+            {dispatchHistory.map((item, index) => (
+              <li
+                key={index}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.5)', padding: 12, borderRadius: 8,
+                  border: '1px solid rgba(148, 163, 184, 0.1)', listStyleType: 'none', fontSize: 12
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: '#c084fc', fontWeight: 'bold' }}>{item.alert_id}</span>
+                  <span style={{ color: '#64748b' }}>{item.timestamp}</span>
+                </div>
+                <div style={{ color: '#e2e8f0', marginBottom: 4 }}>{item.message}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8' }}>
+                  <span>Sent via <strong>{item.channel.toUpperCase()}</strong> to {item.recipient}</span>
+                  <span style={{ color: item.status === 'sent' ? '#34d399' : '#fb7185' }}>
+                    ● {item.status.toUpperCase()}
+                  </span>
+                </div>
+              </li>
+            ))}
+            {dispatchHistory.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#64748b' }}>No dispatches logged in current session.</div>
+            )}
+          </ul>
+        </section>
+
+      </div>
+
+      <AlertDispatchModal
+        alert={selectedAlert}
+        onClose={() => setSelectedAlert(null)}
+        onDispatchSuccess={fetchAlerts}
+      />
     </div>
   );
 }
 
 function ReportsPage() {
   const [report, setReport] = useState<ReportSummary | null>(null);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(false);
+
+  const fetchReport = (districtId: number | null) => {
+    const url = districtId !== null ? `/api/reports/summary?district_id=${districtId}` : '/api/reports/summary';
+    authFetch(url)
+      .then((r) => r.json())
+      .then(setReport);
+  };
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Reports';
-    fetch('/api/reports/summary')
-      .then((r) => r.json())
-      .then(setReport);
-  }, []);
+    fetchReport(selectedDistrictId);
+  }, [selectedDistrictId]);
 
   return (
     <div className="page">
-      <section className="hero-card">
-        <h1 className="hero-title">Reports</h1>
-        <p className="hero-subtitle">
-          Weekly intelligence package with district-level trends and field priority recommendations.
-        </p>
+      <section className="hero-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 className="hero-title">Intelligence Reports & Analytics</h1>
+          <p className="hero-subtitle">
+            Weekly case-aging breakdowns, investigator workload indicators, and official command briefings.
+          </p>
+        </div>
+        <button
+          className="action-button primary-button"
+          onClick={() => setBriefingOpen(true)}
+          style={{ padding: '10px 20px', fontSize: 14, alignSelf: 'center' }}
+        >
+          📄 Print / View Executive Briefing
+        </button>
       </section>
 
       {report ? (
-        <section className="panel list-card">
-          <h3>{report.report_type}</h3>
-          <p className="report-meta">District: {report.district}</p>
-          <ul className="hotspot-list">
-            {report.summary.map((item, index) => (
-              <li key={`${item}-${index}`}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+          
+          {/* Filter Bar */}
+          <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', background: 'rgba(20, 15, 42, 0.4)' }}>
+            <span style={{ fontSize: 13, color: '#9fb5d5', fontWeight: 600 }}>Filter Command Level:</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className={`chip-button ${selectedDistrictId === null ? 'active' : ''}`}
+                onClick={() => setSelectedDistrictId(null)}
+              >
+                State Level (All)
+              </button>
+              {report.districts.slice(0, 6).map((d) => (
+                <button
+                  key={d.id}
+                  className={`chip-button ${selectedDistrictId === d.id ? 'active' : ''}`}
+                  onClick={() => setSelectedDistrictId(d.id)}
+                >
+                  {d.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+            
+            {/* Section 1: Executive Summaries */}
+            <section className="panel list-card">
+              <h3>{report.report_type}</h3>
+              <ul className="hotspot-list" style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {report.summary.map((item, index) => (
+                  <li key={`${item}-${index}`} style={{ background: 'rgba(30, 41, 59, 0.25)', padding: 12, borderRadius: 8, fontSize: 13, color: '#e2e8f0', listStyle: 'none' }}>
+                    🔹 {item}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {/* Section 2: Case Aging Distribution */}
+            <section className="panel list-card">
+              <h3>Active Case Aging Distribution</h3>
+              <div className="chart-wrap" style={{ marginTop: 12 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={report.aging_chart_data} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+                    <XAxis type="number" stroke="#9fb5d5" />
+                    <YAxis dataKey="category" type="category" stroke="#9fb5d5" width={120} style={{ fontSize: 11 }} />
+                    <Tooltip contentStyle={{ background: '#0b172a', border: '1px solid rgba(148,163,184,0.2)' }} />
+                    <Bar dataKey="cases">
+                      {report.aging_chart_data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+          </div>
+
+          {/* Section 3: Workload Matrix */}
+          <section className="panel list-card">
+            <h3 style={{ marginBottom: 12 }}>Investigator Case Workload Matrix</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', color: '#e2e8f0', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid rgba(148,163,184,0.15)', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', color: '#9fb5d5' }}>Investigator Name</th>
+                    <th style={{ padding: '10px 12px', color: '#9fb5d5' }}>Station / Unit Location</th>
+                    <th style={{ padding: '10px 12px', color: '#9fb5d5' }}>District Headquarters</th>
+                    <th style={{ padding: '10px 12px', color: '#9fb5d5' }}>Active Caseload</th>
+                    <th style={{ padding: '10px 12px', color: '#9fb5d5' }}>Overload Threshold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.overloaded_investigators.map((o, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600 }}>👤 {o.name}</td>
+                      <td style={{ padding: '10px 12px' }}>{o.station}</td>
+                      <td style={{ padding: '10px 12px' }}>{o.district}</td>
+                      <td style={{ padding: '10px 12px', color: '#fb7185', fontWeight: 'bold' }}>{o.workload} active cases</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span className="severity-badge severity-high" style={{ fontSize: 9 }}>
+                          +{( ((o.workload - report.average_workload) / report.average_workload) * 100 ).toFixed(0)}% limit
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {report.overloaded_investigators.length === 0 && (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '20px 0', textAlign: 'center', color: '#64748b' }}>
+                        No investigators are currently flagged as overloaded.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>Generating State Intelligence Package...</div>
+      )}
+
+      <ExecutiveBriefingModal
+        isOpen={briefingOpen}
+        onClose={() => setBriefingOpen(false)}
+      />
     </div>
   );
 }

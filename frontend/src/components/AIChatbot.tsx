@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const AUTH_KEY = 'crimecyclops-session';
+function getToken(): string | null {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw)?.token : null;
+  } catch { return null; }
+}
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(getToken() ? { 'Authorization': `Bearer ${getToken()}` } : {}),
+});
+
 interface SourceCitation {
   source: string;
   dataset: string;
@@ -78,7 +90,7 @@ export const AIChatbot: React.FC = () => {
     try {
       await fetch('/api/chat/clear', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ session_id: 'default' }),
       });
       setMessages([
@@ -128,7 +140,7 @@ export const AIChatbot: React.FC = () => {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ message: query, session_id: 'default' }),
       });
 

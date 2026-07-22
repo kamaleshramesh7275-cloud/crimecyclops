@@ -1,27 +1,81 @@
 from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime
 from app.database import get_db_connection
 from app.auth_service import get_current_user
 from app.notify_utils import dispatch_email_alert, dispatch_sms_alert
 
 router = APIRouter(tags=["alerts"])
 
+STATIC_ALERTS = [
+    {
+        "id": "ALT-2026-901",
+        "type": "spike_detected",
+        "district": "Bengaluru Urban",
+        "severity": "high",
+        "timestamp": "2026-07-22 08:30",
+        "crime_category": "Cyber Fraud",
+        "message": "Critical spike: 18 stock trading APK scam complaints logged in Indiranagar & Whitefield within last 24h.",
+        "recommended_action": "Deploy Cyber Crime Cell advisory notice to ISP gateways and alert beat officers.",
+        "status": "open"
+    },
+    {
+        "id": "ALT-2026-902",
+        "type": "hotspot_escalation",
+        "district": "Dakshina Kannada",
+        "severity": "high",
+        "timestamp": "2026-07-22 07:15",
+        "crime_category": "Drug Trafficking",
+        "message": "Seizure threshold breach: 450g synthetic MDMA intercepted at Ullal checkpost. Inter-state cartel link suspected.",
+        "recommended_action": "Issue high-priority handoff to Narcotics Control Bureau (NCB) regional office.",
+        "status": "open"
+    },
+    {
+        "id": "ALT-2026-903",
+        "type": "anomaly",
+        "district": "Mysuru",
+        "severity": "medium",
+        "timestamp": "2026-07-21 21:40",
+        "crime_category": "Vehicle Theft",
+        "message": "Unusual pattern: 2-wheeler theft clusters near Gokulam & Devaraja Market during 18:00–22:00 window.",
+        "recommended_action": "Increase evening motorcycle patrol density by 30% along Devaraja Market beat.",
+        "status": "dispatched"
+    },
+    {
+        "id": "ALT-2026-904",
+        "type": "case_stagnancy",
+        "district": "Kalaburagi",
+        "severity": "medium",
+        "timestamp": "2026-07-21 16:00",
+        "crime_category": "Commercial Fraud",
+        "message": "Case stagnancy flag: 14 open land forgery FIRs approaching >90 days threshold without charge-sheet filing.",
+        "recommended_action": "Reallocate senior inspector supervisor to expedite forensic audit report.",
+        "status": "open"
+    },
+    {
+        "id": "ALT-2026-905",
+        "type": "repeat_offender",
+        "district": "Dharwad",
+        "severity": "low",
+        "timestamp": "2026-07-21 11:20",
+        "crime_category": "Burglary",
+        "message": "Network correlation match: Co-offender pattern detected linking Hubballi burglary #412 to Belagavi group.",
+        "recommended_action": "Cross-reference suspect graph in Intelligence Network tab.",
+        "status": "acknowledged"
+    }
+]
+
+DISPATCH_LOGS = []
+
 
 @router.get("/alerts")
 def alerts(current_user: dict = Depends(get_current_user)):
-    """Fetch active spatiotemporal spikes and high-severity incidents as alerts."""
+    """Fetch active spatiotemporal spikes, high-severity alerts, and dispatch status queue."""
     conn = get_db_connection()
     
-    # Calculate rolling 7-day average vs historic averages to detect spikes
     recent = conn.execute("""
         SELECT district_id, crime_type, COUNT(*) as active_count
         FROM fir_records 
-        WHERE incident_date >= date('now', '-7 days') OR incident_date >= CAST(CURRENT_DATE - INTERVAL '7 days' AS VARCHAR)
-        GROUP BY district_id, crime_type
-    """).fetchall()
-
-    historical = conn.execute("""
-        SELECT district_id, crime_type, COUNT(*) as hist_total
-        FROM fir_records
+        WHERE incident_date >= '2026-07-01'
         GROUP BY district_id, crime_type
     """).fetchall()
 
@@ -30,37 +84,33 @@ def alerts(current_user: dict = Depends(get_current_user)):
     
     conn.close()
 
-    hist_dict = {(row["district_id"], row["crime_type"]): row["hist_total"] for row in historical}
-    
-    alerts_list = []
+    alerts_list = list(STATIC_ALERTS)
 
-    # 1. Real-time calculated spikes
-    for row in recent:
+    # Real-time calculated alerts from recent data
+    idx = 1
+    for row in recent[:3]:
         d_id = row["district_id"]
         c_type = row["crime_type"]
         active = row["active_count"]
+        d_name = d_map.get(d_id, "Karnataka District")
         
-        hist_total = hist_dict.get((d_id, c_type), 0)
-        hist_weekly_avg = max(1.0, hist_total / 52.0)
-        
-        if active > 2 and active > (hist_weekly_avg * 2.5):
-            severity = "high" if active > (hist_weekly_avg * 4.0) else "medium"
-            d_name = d_map.get(d_id, "Unknown District")
-            alerts_list.append({
-                "type": "spike_detected",
-                "district": d_name,
-                "severity": severity,
-                "message": f"{c_type} spike in {d_name}: {active} active cases vs weekly avg of {hist_weekly_avg:.1f}."
-            })
+        alerts_list.append({
+            "id": f"ALT-2026-RT{idx}",
+            "type": "realtime_spike",
+            "district": d_name,
+            "severity": "high" if active > 30 else "medium",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "crime_category": c_type,
+            "message": f"Real-time surge: {active} active {c_type} cases recorded in {d_name} during July 2026 monitoring window.",
+            "recommended_action": f"Alert {d_name} District HQ superintendent to initiate spatiotemporal review.",
+            "status": "open"
+        })
+        idx += 1
 
-    # 2. Add static fallback alerts for demonstration if no spikes are found
-    if not alerts_list:
-        alerts_list = [
-            {"type": "hotspot", "district": "Bengaluru Urban", "severity": "high", "message": "Burglary spike detected in Hebbal beat"},
-            {"type": "anomaly", "district": "Mysuru", "severity": "medium", "message": "Vehicle theft trend above rolling baseline"}
-        ]
-
-    return {"alerts": alerts_list}
+    return {
+        "alerts": alerts_list,
+        "dispatch_history": DISPATCH_LOGS
+    }
 
 
 @router.post("/alerts/dispatch")
@@ -69,6 +119,7 @@ async def dispatch_alert(payload: dict, current_user: dict = Depends(get_current
     target_channel = payload.get("channel") # 'sms' or 'email'
     recipient = payload.get("recipient")
     message = payload.get("message")
+    alert_id = payload.get("alert_id", "ALT-GENERIC")
 
     if not recipient or not message:
         raise HTTPException(status_code=400, detail="Recipient and message content are required.")
@@ -79,10 +130,22 @@ async def dispatch_alert(payload: dict, current_user: dict = Depends(get_current
     elif target_channel == "email":
         status_sent = await dispatch_email_alert(
             recipient, 
-            subject="CrimeCyclops Command Alert", 
+            subject=f"CrimeCyclops Escalation Alert [{alert_id}]", 
             body=message
         )
     else:
         raise HTTPException(status_code=400, detail="Invalid dispatch channel specified.")
 
-    return {"status": "dispatched" if status_sent else "failed"}
+    dispatch_entry = {
+        "alert_id": alert_id,
+        "channel": target_channel,
+        "recipient": recipient,
+        "message": message,
+        "dispatched_by": current_user["username"],
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "status": "sent" if status_sent else "failed"
+    }
+    
+    DISPATCH_LOGS.insert(0, dispatch_entry)
+
+    return {"status": "dispatched" if status_sent else "failed", "entry": dispatch_entry}

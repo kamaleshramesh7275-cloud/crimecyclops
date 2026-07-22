@@ -11,7 +11,9 @@ from app.routers import auth as auth_router
 from app.routers import alerts as alerts_router
 from app.routers import geo as geo_router
 from app.routers import analytics as analytics_router
+from app.routers import public_safety as public_safety_router
 from chatbot.routes import router as chatbot_router
+
 from chatbot.vectorstore import vector_store_instance
 from chatbot.dataset_loader import load_all_dataset
 import os
@@ -51,6 +53,8 @@ app.add_middleware(
 
 # Public routes
 app.include_router(auth_router.router, prefix="/api")
+app.include_router(public_safety_router.router, prefix="/api")
+
 
 # Authenticated routes (investigators and analysts)
 app.include_router(dashboard_router.router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])

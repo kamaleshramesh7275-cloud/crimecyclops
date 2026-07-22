@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.database import get_db_connection, init_db
+from app.auth_service import get_password_hash
 from chatbot.vectorstore import vector_store_instance
 from chatbot.dataset_loader import load_all_dataset
 
@@ -219,7 +220,7 @@ def seed_demo_data():
 
     conn.execute(
         "INSERT INTO users(username, role, password) VALUES (?, ?, ?)",
-        ("admin", "state analyst", "admin123"),
+        ("admin", "admin", get_password_hash("admin123")),
     )
     conn.execute(
         "INSERT INTO audit_log(user_name, action, resource) VALUES (?, ?, ?)",
