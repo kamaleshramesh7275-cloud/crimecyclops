@@ -7,6 +7,8 @@ interface GraphNode {
   node_type: string;
   district: string;
   degree: number;
+  degree_centrality: number;
+  betweenness: number;
   depth?: number;
   parent?: GraphNode | null;
   x?: number;
