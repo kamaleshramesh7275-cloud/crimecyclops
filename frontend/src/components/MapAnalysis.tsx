@@ -4,6 +4,12 @@ import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import StationDrawer from './StationDrawer';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+  LineChart, Line,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
+} from 'recharts';
 
 // @ts-ignore
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -281,56 +287,120 @@ export default function MapAnalysis() {
     { label: 'Fraud', value: 18 }
   ];
 
+  // Mock data for new charts
+  const contrastData = [
+    { name: '2021', open: 400, closed: 240 },
+    { name: '2022', open: 300, closed: 139 },
+    { name: '2023', open: 200, closed: 980 },
+    { name: '2024', open: 278, closed: 390 },
+  ];
+
+  const distributionData = [
+    { name: 'Theft', value: 400, color: '#f43f5e' },
+    { name: 'Cyber', value: 300, color: '#38bdf8' },
+    { name: 'Assault', value: 300, color: '#fbbf24' },
+    { name: 'Drugs', value: 200, color: '#34d399' }
+  ];
+
+  const curvesData = [
+    { name: 'Jan', val1: 40, val2: 24 },
+    { name: 'Feb', val1: 30, val2: 13 },
+    { name: 'Mar', val1: 20, val2: 98 },
+    { name: 'Apr', val1: 27, val2: 39 },
+    { name: 'May', val1: 18, val2: 48 },
+  ];
+
+  const radarChartData = [
+    { subject: 'Mountain', A: 120, B: 110, fullMark: 150 },
+    { subject: 'Ocean', A: 98, B: 130, fullMark: 150 },
+    { subject: 'Forest', A: 86, B: 130, fullMark: 150 },
+    { subject: 'Desert', A: 99, B: 100, fullMark: 150 },
+    { subject: 'City', A: 85, B: 90, fullMark: 150 },
+  ];
+
   return (
     <div className="sci-fi-dashboard">
       
       {/* LEFT COLUMN */}
-      <div className="sci-fi-col-left">
-        <div className="sci-fi-panel" style={{ flex: 1 }}>
+      <div className="sci-fi-col-left" style={{ width: '380px' }}>
+        
+        {/* STATISTIC */}
+        <div className="sci-fi-panel" style={{ flex: '0 0 auto' }}>
           <div className="sci-fi-panel-header">
             <span className="crosshair">+</span>
-            <span>Statistic Overview</span>
+            <span>Statistic</span>
           </div>
-          <div className="sci-fi-stat-row">
-            <div className="sci-fi-stat-icon">📄</div>
-            <div className="sci-fi-stat-info">
-              <div className="sci-fi-stat-label">Total FIRs</div>
-              <div className="sci-fi-stat-value text-blue-400">{totalFIRs.toLocaleString()}</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded bg-blue-900/40 border border-blue-500/30 flex items-center justify-center text-blue-400">📄</div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Total FIRs</span>
+                <span className="text-xl font-bold text-gray-100">{totalFIRs.toLocaleString()}</span>
+              </div>
             </div>
-          </div>
-          <div className="sci-fi-stat-row">
-            <div className="sci-fi-stat-icon text-red-400">🚨</div>
-            <div className="sci-fi-stat-info">
-              <div className="sci-fi-stat-label">Open Cases</div>
-              <div className="sci-fi-stat-value text-red-400">{totalOpen.toLocaleString()}</div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded bg-red-900/40 border border-red-500/30 flex items-center justify-center text-red-400">🚨</div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Open Cases</span>
+                <span className="text-xl font-bold text-gray-100">{totalOpen.toLocaleString()}</span>
+              </div>
             </div>
-          </div>
-          <div className="sci-fi-stat-row">
-            <div className="sci-fi-stat-icon text-emerald-400">🏢</div>
-            <div className="sci-fi-stat-info">
-              <div className="sci-fi-stat-label">Active Stations</div>
-              <div className="sci-fi-stat-value text-emerald-400">{totalStations.toLocaleString()}</div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400">🏢</div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest">Stations</span>
+                <span className="text-xl font-bold text-gray-100">{totalStations.toLocaleString()}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="sci-fi-panel" style={{ flex: 1 }}>
+        {/* CONTRAST (Bar Chart) */}
+        <div className="sci-fi-panel" style={{ flex: '1 1 200px' }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Contrast</span>
+          </div>
+          <div className="w-full h-[180px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={contrastData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'rgba(56,189,248,0.1)' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#38bdf8' }} />
+                <Bar dataKey="open" fill="#38bdf8" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="closed" fill="#f43f5e" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* DISTRIBUTION (Donut Chart) */}
+        <div className="sci-fi-panel" style={{ flex: '1 1 200px' }}>
           <div className="sci-fi-panel-header">
             <span className="crosshair">+</span>
             <span>Distribution</span>
           </div>
-          <div className="flex flex-col gap-3">
-             {topDistricts.map(d => (
-               <div key={d.id} className="flex flex-col gap-1">
-                 <div className="flex justify-between text-[11px] text-gray-300">
-                    <span>{d.name}</span>
-                    <span className="text-blue-400 font-bold">{d.total_firs}</span>
+          <div className="w-full h-[180px] flex items-center">
+            <div className="flex-1 h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={distributionData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={5} dataKey="value" stroke="none">
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#38bdf8' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-[120px] flex flex-col gap-2">
+               {distributionData.map(d => (
+                 <div key={d.name} className="flex items-center gap-2 text-xs">
+                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }}></div>
+                   <span className="text-gray-300 flex-1">{d.name}</span>
                  </div>
-                 <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" style={{ width: `${(d.total_firs / (topDistricts[0]?.total_firs || 1)) * 100}%` }}></div>
-                 </div>
-               </div>
-             ))}
+               ))}
+            </div>
           </div>
         </div>
       </div>
@@ -381,44 +451,98 @@ export default function MapAnalysis() {
       </div>
 
       {/* RIGHT COLUMN */}
-      <div className="sci-fi-col-right">
-        <div className="sci-fi-panel" style={{ flex: 1 }}>
+      <div className="sci-fi-col-right" style={{ width: '380px' }}>
+        
+        {/* OVERVIEW (Glowing Spheres) */}
+        <div className="sci-fi-panel" style={{ flex: '0 0 auto' }}>
           <div className="sci-fi-panel-header">
             <span className="crosshair">+</span>
-            <span>Radar Metrics</span>
+            <span>Overview</span>
           </div>
-          <div className="flex flex-col h-full justify-center gap-2">
-            {radarData.map(item => (
-              <div key={item.label} className="flex justify-between items-center text-xs">
-                 <span className="text-gray-400">{item.label}</span>
-                 <div className="flex-1 mx-3 border-b border-dashed border-gray-700"></div>
-                 <span className="text-emerald-400 font-bold">{item.value}%</span>
+          <div className="flex justify-around items-center py-4">
+             <div className="flex flex-col items-center gap-2">
+               <div className="w-16 h-16 rounded-full flex items-center justify-center relative">
+                 <div className="absolute inset-0 rounded-full border-2 border-dashed border-sky-400 animate-spin-slow"></div>
+                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-900 to-sky-400 opacity-80 shadow-[0_0_20px_#38bdf8]"></div>
+               </div>
+               <span className="text-[10px] text-gray-400 uppercase tracking-widest">Earth</span>
+               <span className="text-sm font-bold text-sky-200">1231<span className="text-[9px] text-gray-500">km/h</span></span>
+             </div>
+             <div className="flex flex-col items-center gap-2">
+               <div className="w-16 h-16 rounded-full flex items-center justify-center relative">
+                 <div className="absolute inset-0 rounded-full border-2 border-dashed border-rose-400 animate-spin-slow" style={{ animationDirection: 'reverse' }}></div>
+                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-rose-900 to-rose-400 opacity-80 shadow-[0_0_20px_#fb7185]"></div>
+               </div>
+               <span className="text-[10px] text-gray-400 uppercase tracking-widest">Mars</span>
+               <span className="text-sm font-bold text-rose-200">1187<span className="text-[9px] text-gray-500">km/h</span></span>
+             </div>
+          </div>
+        </div>
+
+        {/* CURVES (Line Chart) */}
+        <div className="sci-fi-panel" style={{ flex: '1 1 180px' }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Curves</span>
+          </div>
+          <div className="w-full h-[150px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={curvesData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#38bdf8' }} />
+                <Line type="monotone" dataKey="val1" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="val2" stroke="#f43f5e" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* RADAR */}
+        <div className="sci-fi-panel" style={{ flex: '1 1 200px' }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Radar</span>
+          </div>
+          <div className="w-full h-[200px]">
+             <ResponsiveContainer width="100%" height="100%">
+               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarChartData}>
+                 <PolarGrid stroke="rgba(56,189,248,0.2)" />
+                 <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                 <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
+                 <Radar name="Mike" dataKey="A" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} />
+                 <Radar name="Lily" dataKey="B" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.4} />
+               </RadarChart>
+             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* LIST */}
+        <div className="sci-fi-panel" style={{ flex: '1 1 180px' }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>List</span>
+          </div>
+          <div className="flex flex-col overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-sky-500/50 max-h-[150px]">
+            {[
+              { id: 1, loc: 'New York', country: 'United States' },
+              { id: 2, loc: 'Los Angeles', country: 'United States' },
+              { id: 3, loc: 'Hamburg', country: 'Germany' },
+              { id: 4, loc: 'Berlin', country: 'Germany' },
+              { id: 5, loc: 'Tokyo', country: 'Japan' },
+            ].map(item => (
+              <div key={item.id} className="flex justify-between items-center py-2 border-b border-sky-500/10 text-xs hover:bg-sky-500/10 transition-colors px-2 rounded cursor-pointer">
+                 <div className="flex items-center gap-3">
+                   <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></div>
+                   <span className="text-gray-200">{item.loc}</span>
+                 </div>
+                 <span className="text-gray-500">{item.country}</span>
+                 <span className="text-sky-400 cursor-pointer hover:text-sky-300">View</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="sci-fi-panel" style={{ flex: 1.5 }}>
-          <div className="sci-fi-panel-header">
-            <span className="crosshair">+</span>
-            <span>Live Activity Feed</span>
-          </div>
-          <div className="flex flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-sky-500/50 max-h-[300px]">
-             {recentActivities.map(act => (
-               <div key={act.id} 
-                    className="p-2 border border-sky-500/20 bg-sky-900/10 rounded cursor-pointer hover:bg-sky-500/20 transition-all flex flex-col gap-1"
-                    onClick={() => (window as any).__ccDrillToDistrict(act.district_name)}>
-                 <div className="flex justify-between text-[10px] text-sky-400 uppercase tracking-widest font-bold">
-                    <span>{act.crime_type}</span>
-                    <span className="text-gray-500">{new Date(act.incident_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                 </div>
-                 <div className="text-sm text-gray-200">{act.district_name} District</div>
-                 <div className="text-[10px] text-gray-500 truncate">{act.station_name}</div>
-               </div>
-             ))}
-             {recentActivities.length === 0 && <div className="text-xs text-gray-500 text-center">Awaiting data...</div>}
-          </div>
-        </div>
       </div>
 
     </div>
