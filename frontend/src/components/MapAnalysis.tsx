@@ -82,6 +82,25 @@ export default function MapAnalysis() {
 
   const isKn = i18n.language === 'kn';
 
+  // Photo Ingester State
+  const [isIngesterOpen, setIsIngesterOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<any>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [ingesterMessage, setIngesterMessage] = useState("");
+
+  const refreshData = () => {
+    let url = '/api/geo/districts?';
+    if (crimeFilter !== 'All') url += `crime_type=${encodeURIComponent(crimeFilter)}&`;
+    if (statusFilter !== 'All') url += `status=${encodeURIComponent(statusFilter)}&`;
+    
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => setDistricts(data.districts || []));
+  };
+
+
   // Fetch GeoJSON and Recent Activities once
   useEffect(() => {
     document.title = 'CrimeCyclops | Map Analysis';
@@ -115,13 +134,7 @@ export default function MapAnalysis() {
 
   // Fetch Districts data when filters change
   useEffect(() => {
-    let url = '/api/geo/districts?';
-    if (crimeFilter !== 'All') url += `crime_type=${encodeURIComponent(crimeFilter)}&`;
-    if (statusFilter !== 'All') url += `status=${encodeURIComponent(statusFilter)}&`;
-    
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => setDistricts(data.districts || []));
+    refreshData();
   }, [crimeFilter, statusFilter]);
 
   // Fetch Active District's Station Data when filters change (if drilled down)
@@ -395,12 +408,243 @@ export default function MapAnalysis() {
         </div>
       </div>
 
+      {/* PHOTO INGESTER MODAL */}
+      {isIngesterOpen && (
+        <div className="photo-ingester-modal">
+          <div className="photo-ingester-content">
+            <div className="flex justify-between items-center border-b border-sky-500/20 px-6 py-4 bg-slate-900/50">
+              <h2 className="text-sky-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                <span>📷</span> AI Case Photo Ingester
+              </h2>
+              <button 
+                className="text-gray-400 hover:text-sky-400 transition-colors text-xl font-bold cursor-pointer"
+                onClick={() => setIsIngesterOpen(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+              {!parsedData && !isParsing ? (
+                <div className="flex-1 flex flex-col justify-center items-center">
+                  <label className="drag-drop-zone w-full max-w-lg py-12">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setIsParsing(true);
+                          setIngesterMessage("Analyzing case photo with AI Vision...");
+                          
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          
+                          fetch('/api/geo/parse-photo', {
+                            method: 'POST',
+                            body: formData
+                          })
+                            .then((r) => {
+                              if (!r.ok) throw new Error("Failed to parse photo");
+                              return r.json();
+                            })
+                            .then((res) => {
+                              setParsedData(res.data || {});
+                              setIsParsing(false);
+                              setIngesterMessage("AI analysis complete! Review extracted fields below.");
+                            })
+                            .catch((err) => {
+                              setIsParsing(false);
+                              setIngesterMessage(`Error: ${err.message || err}`);
+                            });
+                        }
+                      }}
+                    />
+                    <div className="text-4xl mb-3">📁</div>
+                    <div className="text-sky-400 font-bold uppercase tracking-wider text-sm">Upload Case Photo / FIR Document</div>
+                    <div className="text-[10px] text-gray-500 mt-2">Supports JPG, PNG, WEBP. Drag and drop file or click to browse.</div>
+                  </label>
+                </div>
+              ) : isParsing ? (
+                <div className="flex-1 flex flex-col justify-center items-center gap-4">
+                  <div className="scanner-loader w-full max-w-sm">
+                    <div className="text-3xl animate-pulse">📷</div>
+                    <div className="text-sky-400 font-bold text-xs uppercase tracking-widest">{ingesterMessage}</div>
+                    <div className="scanner-bar"></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-6 flex-1">
+                  {/* Left: Image preview */}
+                  <div className="border border-sky-500/20 rounded bg-slate-900/40 p-4 flex items-center justify-center relative overflow-hidden">
+                    {selectedFile && (
+                      <img 
+                        src={URL.createObjectURL(selectedFile)} 
+                        alt="Preview" 
+                        className="max-h-[350px] object-contain rounded shadow-[0_0_15px_rgba(56,189,248,0.2)]" 
+                      />
+                    )}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-sky-400/50 shadow-[0_0_8px_#38bdf8] animate-[scan-vertical_3s_infinite_linear]"></div>
+                  </div>
+
+                  {/* Right: Extracted fields Form */}
+                  <div className="flex flex-col gap-4 border border-sky-500/20 rounded bg-slate-900/40 p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">District</label>
+                        <input 
+                          type="text" 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none"
+                          value={parsedData.district_name || ""} 
+                          onChange={(e) => setParsedData({ ...parsedData, district_name: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">Police Station</label>
+                        <input 
+                          type="text" 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none"
+                          value={parsedData.station_name || ""} 
+                          onChange={(e) => setParsedData({ ...parsedData, station_name: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">Crime Type</label>
+                        <select 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none cursor-pointer"
+                          value={parsedData.crime_type || "Cyber Fraud"} 
+                          onChange={(e) => setParsedData({ ...parsedData, crime_type: e.target.value })}
+                        >
+                          {["Cyber Fraud", "Drug Trafficking", "Burglary", "Vehicle Theft", "Assault", "Domestic Violence", "Missing Person", "Commercial Fraud"].map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">IPC Section</label>
+                        <input 
+                          type="text" 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none"
+                          value={parsedData.ipc_section || ""} 
+                          onChange={(e) => setParsedData({ ...parsedData, ipc_section: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">Incident Date</label>
+                        <input 
+                          type="date" 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none cursor-pointer"
+                          value={parsedData.incident_date || ""} 
+                          onChange={(e) => setParsedData({ ...parsedData, incident_date: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-400 uppercase tracking-widest">Status</label>
+                        <select 
+                          className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none cursor-pointer"
+                          value={parsedData.status || "open"} 
+                          onChange={(e) => setParsedData({ ...parsedData, status: e.target.value })}
+                        >
+                          {["open", "under investigation", "closed", "charge-sheeted"].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 flex-1">
+                      <label className="text-[10px] text-gray-400 uppercase tracking-widest">Description</label>
+                      <textarea 
+                        className="bg-slate-950 border border-sky-500/20 rounded p-2 text-xs text-gray-100 focus:border-sky-400 focus:outline-none resize-none flex-1 min-h-[80px]"
+                        value={parsedData.description || ""} 
+                        onChange={(e) => setParsedData({ ...parsedData, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-sky-500/20 px-6 py-4 flex justify-between items-center bg-slate-900/50">
+              <span className="text-[10px] text-sky-400/70 font-mono">{ingesterMessage}</span>
+              <div className="flex gap-3">
+                {parsedData && (
+                  <button 
+                    className="px-5 py-2 rounded border border-gray-500/30 bg-slate-800 text-gray-300 font-bold text-xs uppercase hover:bg-slate-700 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setParsedData(null);
+                      setSelectedFile(null);
+                      setIngesterMessage("");
+                    }}
+                  >
+                    Rescan
+                  </button>
+                )}
+                <button 
+                  className="px-5 py-2 rounded border border-sky-500/30 bg-sky-950/40 text-sky-400 font-bold text-xs uppercase hover:bg-sky-500/20 hover:text-sky-300 transition-colors cursor-pointer disabled:opacity-50"
+                  disabled={!parsedData || saveLoading}
+                  onClick={() => {
+                    setSaveLoading(true);
+                    setIngesterMessage("Saving case details to intelligence database...");
+                    
+                    fetch('/api/geo/save-parsed-case', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(parsedData)
+                    })
+                      .then((r) => {
+                        if (!r.ok) throw new Error("Failed to save case");
+                        return r.json();
+                      })
+                      .then((res) => {
+                        setSaveLoading(false);
+                        setIngesterMessage(`Success: Case record successfully ${res.action}!`);
+                        refreshData();
+                        setTimeout(() => setIsIngesterOpen(false), 1500);
+                      })
+                      .catch((err) => {
+                        setSaveLoading(false);
+                        setIngesterMessage(`Error: ${err.message || err}`);
+                      });
+                  }}
+                >
+                  {saveLoading ? "Saving..." : "Save Record"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CENTER COLUMN (MAP) */}
       <div className="sci-fi-col-center">
-        <div className="sci-fi-header-overlay">
+        <div className="sci-fi-header-overlay flex justify-between items-center w-full px-4">
            <div className="sci-fi-title">Map Data Visualization</div>
+           <button 
+              className="px-4 py-1.5 rounded border border-sky-500/30 bg-sky-950/40 text-sky-400 font-bold text-xs uppercase tracking-widest hover:bg-sky-500/20 hover:text-sky-300 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_10px_rgba(56,189,248,0.15)]"
+              onClick={() => {
+                setIsIngesterOpen(true);
+                setSelectedFile(null);
+                setParsedData(null);
+                setIngesterMessage("");
+              }}
+           >
+              📷 Case Photo Scanner
+           </button>
         </div>
-        <div className="sci-fi-map-container" ref={mapDivRef} />
+        <div className="map-scanner-container relative w-full h-full">
+          <div className="map-scanner-grid"></div>
+          <div className="map-scanner-line"></div>
+          <div className="w-full h-full" ref={mapDivRef} />
+        </div>
         
         {/* GeoHierarchy Breadcrumb (Sci-Fi Style) */}
         <div className="absolute top-24 z-[400] w-full flex justify-center pointer-events-none">
