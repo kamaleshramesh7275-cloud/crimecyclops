@@ -34,13 +34,19 @@ class postgres_wrapper:
     def execute(self, query, vars=None):
         cur = self.conn.cursor()
         query = query.replace("?", "%s")
-        cur.execute(query, vars)
+        if vars:
+            cur.execute(query, vars)
+        else:
+            cur.execute(query)
         return cur
         
     def executemany(self, query, vars_list):
         cur = self.conn.cursor()
         query = query.replace("?", "%s")
-        cur.executemany(query, vars_list)
+        if vars_list:
+            cur.executemany(query, vars_list)
+        else:
+            cur.executemany(query)
         return cur
         
     def executescript(self, script):
@@ -53,9 +59,19 @@ class postgres_wrapper:
         
     def rollback(self):
         self.conn.rollback()
-        
+
     def close(self):
         self.conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
         
     def __enter__(self):
         return self
