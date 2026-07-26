@@ -598,7 +598,7 @@ export default function MapAnalysis() {
               <div className="flex gap-3">
                 {parsedData && (
                   <button 
-                    className="px-5 py-2 rounded border border-gray-500/30 bg-slate-800 text-gray-300 font-bold text-xs uppercase hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="sci-fi-button"
                     onClick={() => {
                       setParsedData(null);
                       setSelectedFile(null);
@@ -609,7 +609,7 @@ export default function MapAnalysis() {
                   </button>
                 )}
                 <button 
-                  className="px-5 py-2 rounded border border-sky-500/30 bg-sky-950/40 text-sky-400 font-bold text-xs uppercase hover:bg-sky-500/20 hover:text-sky-300 transition-colors cursor-pointer disabled:opacity-50"
+                  className="sci-fi-button"
                   disabled={!parsedData || saveLoading}
                   onClick={() => {
                     setSaveLoading(true);
@@ -649,7 +649,7 @@ export default function MapAnalysis() {
         <div className="sci-fi-header-overlay flex justify-between items-center w-full px-4">
            <div className="sci-fi-title">Map Data Visualization</div>
            <button 
-              className="px-4 py-1.5 rounded border border-sky-500/30 bg-sky-950/40 text-sky-400 font-bold text-xs uppercase tracking-widest hover:bg-sky-500/20 hover:text-sky-300 transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_10px_rgba(56,189,248,0.15)]"
+              className="sci-fi-button"
               onClick={() => {
                 setIsIngesterOpen(true);
                 setSelectedFile(null);
@@ -660,7 +660,7 @@ export default function MapAnalysis() {
               📷 Case Photo Scanner
            </button>
         </div>
-        <div className="map-scanner-container relative w-full h-full">
+        <div className="sci-fi-map-container" style={{ overflow: 'hidden' }}>
           {showGrid && <div className="map-scanner-grid"></div>}
           {showScanner && <div className="map-scanner-line"></div>}
           <div className="w-full h-full" ref={mapDivRef} />
