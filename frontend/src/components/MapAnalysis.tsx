@@ -97,11 +97,11 @@ export default function MapAnalysis() {
       zoom: 7,
       zoomControl: true,
     });
-    // No base map tiles! Keep it completely dark/holographic
-    // L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    //   attribution: '© OpenStreetMap contributors, © CARTO',
-    //   maxZoom: 19,
-    // }).addTo(map);
+    // Restore Dark Matter Tactical Map Tiles for geographical context
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap contributors, © CARTO',
+      maxZoom: 19,
+    }).addTo(map);
     
     stationLayersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
