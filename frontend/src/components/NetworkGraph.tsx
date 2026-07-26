@@ -324,16 +324,16 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
 
         // Draw Icon / Badge Inside (Top Left)
         ctx.fillStyle = baseColor;
-        ctx.font = \`bold \${size * 0.25}px Inter\`;
+        ctx.font = `bold ${size * 0.25}px Inter`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillText(n.node_type === 'FIR' ? '📄' : n.group.charAt(0).toUpperCase(), x + 6, y + 6);
         
         // Draw Node ID / Small text top right
         ctx.fillStyle = '#9ca3af'; // gray-400
-        ctx.font = \`\${size * 0.15}px Inter\`;
+        ctx.font = `${size * 0.15}px Inter`;
         ctx.textAlign = 'right';
-        ctx.fillText(\`#\${n.id.substring(0,4)}\`, x + size - 6, y + 6);
+        ctx.fillText(`#${n.id.substring(0,4)}`, x + size - 6, y + 6);
 
         // Draw Label Inside (Centered)
         const labelText = n.label.length > 10 && size < 60 ? n.label.substring(0, 8) + '..' : n.label;
@@ -341,7 +341,7 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         // Only show text if it's large enough or hovered, to prevent extreme clutter
         if (size >= 60 || isHighlighted || isSelected) {
             ctx.fillStyle = isHighlighted ? '#ffffff' : '#f3f4f6'; // white or gray-100
-            ctx.font = \`\${size * 0.18}px Inter\`;
+            ctx.font = `${size * 0.18}px Inter`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
