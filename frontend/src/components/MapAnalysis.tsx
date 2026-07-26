@@ -72,14 +72,22 @@ export default function MapAnalysis() {
   const [crimeFilter, setCrimeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
 
+  // Live Feed
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
   const isKn = i18n.language === 'kn';
 
-  // Fetch GeoJSON once
+  // Fetch GeoJSON and Recent Activities once
   useEffect(() => {
     document.title = 'CrimeCyclops | Map Analysis';
     fetch('/karnataka-districts.geojson')
       .then((r) => r.json())
       .then(setGeoJson);
+      
+    // Fetch live feed
+    fetch('/api/dashboard/recent-activity')
+      .then((r) => r.json())
+      .then((data) => setRecentActivities(data.recent || []));
   }, []);
 
   // Initialize map once
@@ -204,12 +212,15 @@ export default function MapAnalysis() {
       else if (crimeLevel === 'mid') color = '#fb923c';
 
       const icon = L.divIcon({
-        className: '',
-        html: `<div class="station-pin" style="background:${color}; border-color:${color}">
-          <span>${st.fir_count}</span>
-        </div>`,
+        className: 'bg-transparent border-none',
+        html: `
+          <div class="radar-pulse-marker ${crimeLevel === 'low' ? 'safe' : ''}">
+            <div class="radar-pulse-core" style="background-color: ${color}; box-shadow: 0 0 10px ${color}"></div>
+            <div class="radar-pulse-ring" style="border-color: ${color}; animation-duration: ${crimeLevel === 'high' ? '1s' : '2s'}"></div>
+          </div>
+        `,
         iconSize: [40, 40],
-        iconAnchor: [20, 40],
+        iconAnchor: [20, 20],
       });
 
       const marker = L.marker([st.latitude, st.longitude], { icon });
@@ -265,11 +276,11 @@ export default function MapAnalysis() {
 
       <div className="map-container" ref={mapDivRef} />
 
-      {/* Floating Filter Bar */}
-      <div className="map-filter-bar">
-        <div className="map-filter-group">
-          <span className="map-filter-label">{isKn ? 'ಅಪರಾಧದ ಪ್ರಕಾರ' : 'Crime Type'}:</span>
-          <select className="map-filter-select" value={crimeFilter} onChange={e => setCrimeFilter(e.target.value)}>
+      {/* Floating Filter Bar - Glassmorphic */}
+      <div className="absolute top-4 right-4 bg-gray-800/90 backdrop-blur-md border border-gray-700 p-4 rounded-xl shadow-xl z-[400] flex gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{isKn ? 'ಅಪರಾಧದ ಪ್ರಕಾರ' : 'Crime Type'}</span>
+          <select className="bg-gray-900/80 border border-gray-600 text-gray-200 text-sm rounded-lg p-2 outline-none" value={crimeFilter} onChange={e => setCrimeFilter(e.target.value)}>
             <option value="All">{isKn ? 'ಎಲ್ಲಾ' : 'All'}</option>
             <option value="Theft">{isKn ? 'ಕಳ್ಳತನ (Theft)' : 'Theft'}</option>
             <option value="Burglary">{isKn ? 'ಕನ್ನ (Burglary)' : 'Burglary'}</option>
@@ -278,9 +289,9 @@ export default function MapAnalysis() {
             <option value="Drug Trafficking">{isKn ? 'ಮಾದಕವಸ್ತು ಸಾಗಣೆ (Drugs)' : 'Drug Trafficking'}</option>
           </select>
         </div>
-        <div className="map-filter-group">
-          <span className="map-filter-label">{isKn ? 'ಸ್ಥಿತಿ' : 'Status'}:</span>
-          <select className="map-filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{isKn ? 'ಸ್ಥಿತಿ' : 'Status'}</span>
+          <select className="bg-gray-900/80 border border-gray-600 text-gray-200 text-sm rounded-lg p-2 outline-none" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="All">{isKn ? 'ಎಲ್ಲಾ' : 'All'}</option>
             <option value="Open">{isKn ? 'ತೆರೆದ (Open)' : 'Open'}</option>
             <option value="Closed">{isKn ? 'ಮುಚ್ಚಿದ (Closed)' : 'Closed'}</option>
@@ -297,20 +308,52 @@ export default function MapAnalysis() {
         }}
       />
 
-      <div className="map-legend">
-        <div className="legend-title">{t('crimeIntensity', 'Crime Intensity')}</div>
-        {[
-          { color: '#f43f5e', label: t('veryHigh', 'Very High') },
-          { color: '#fb923c', label: t('high', 'High') },
-          { color: '#fbbf24', label: t('medium', 'Medium') },
-          { color: '#c084fc', label: t('low', 'Low') },
-          { color: '#34d399', label: t('veryLow', 'Very Low') },
-        ].map(({ color, label }) => (
-          <div key={color} className="legend-row">
-            <span className="legend-swatch" style={{ background: color }} />
-            <span>{label}</span>
-          </div>
-        ))}
+      {/* Glassmorphic Legend */}
+      <div className="absolute bottom-6 right-4 bg-gray-800/90 backdrop-blur-md border border-gray-700 p-4 rounded-xl shadow-xl z-[400]">
+        <div className="text-sm font-bold text-gray-100 mb-3 tracking-wide uppercase">{t('crimeIntensity', 'Crime Intensity')}</div>
+        <div className="flex flex-col gap-2">
+          {[
+            { color: '#f43f5e', label: t('veryHigh', 'Very High') },
+            { color: '#fb923c', label: t('high', 'High') },
+            { color: '#fbbf24', label: t('medium', 'Medium') },
+            { color: '#c084fc', label: t('low', 'Low') },
+            { color: '#34d399', label: t('veryLow', 'Very Low') },
+          ].map(({ color, label }) => (
+            <div key={color} className="flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
+              <span className="text-xs font-semibold text-gray-300">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Live Intelligence Feed Overlay */}
+      <div className="absolute top-20 left-4 w-72 bg-gray-800/80 backdrop-blur-lg border border-gray-700 rounded-xl shadow-2xl z-[400] flex flex-col overflow-hidden max-h-[60vh]">
+        <div className="p-4 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
+            <h3 className="text-sm font-bold text-gray-100 uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              Live Feed
+            </h3>
+            <span className="text-xs text-gray-400">STATEWIDE</span>
+        </div>
+        <div className="overflow-y-auto p-3 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-gray-600">
+            {recentActivities.map((act) => (
+              <div key={act.id} 
+                   className="bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 hover:bg-gray-700/40 cursor-pointer transition-colors"
+                   onClick={() => (window as any).__ccDrillToDistrict(act.district_name)}
+              >
+                  <div className="flex justify-between items-start mb-1">
+                      <span className="text-xs font-bold text-indigo-400">{act.crime_type}</span>
+                      <span className="text-[10px] text-gray-500">{new Date(act.incident_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </div>
+                  <div className="text-sm text-gray-200 font-medium">{act.district_name} District</div>
+                  <div className="text-xs text-gray-400 mt-1">{act.station_name}</div>
+              </div>
+            ))}
+            {recentActivities.length === 0 && (
+              <div className="text-center text-gray-500 text-xs py-4">No recent activity</div>
+            )}
+        </div>
       </div>
     </div>
   );

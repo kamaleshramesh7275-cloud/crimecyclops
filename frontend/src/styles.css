@@ -1736,3 +1736,59 @@ input {
 .status-pill-sm.closed      { background: rgba(52,211,153,0.18);  color: #34d399; }
 .status-pill-sm.investigation { background: rgba(251,191,36,0.18);  color: #fbbf24; }
 .status-pill-sm.default     { background: rgba(148,163,184,0.15); color: #9fb5d5; }
+
+/* ═══════════════════════════════════════════════
+   MAP ANALYSIS ENHANCEMENTS
+═══════════════════════════════════════════════ */
+
+/* Neon radar pulsing markers for map stations */
+.radar-pulse-marker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.radar-pulse-core {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #fb7185; /* Rose 400 */
+  box-shadow: 0 0 10px #fb7185, 0 0 20px #fb7185;
+  z-index: 2;
+}
+
+.radar-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #fb7185;
+  opacity: 0;
+  animation: radar-pulse-anim 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  z-index: 1;
+}
+
+@keyframes radar-pulse-anim {
+  0% {
+    width: 10px;
+    height: 10px;
+    opacity: 1;
+  }
+  100% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+  }
+}
+
+.radar-pulse-marker.safe .radar-pulse-core {
+  background-color: #34d399; /* Emerald 400 */
+  box-shadow: 0 0 8px #34d399;
+}
+.radar-pulse-marker.safe .radar-pulse-ring {
+  display: none; /* No pulse for safe stations */
+}
