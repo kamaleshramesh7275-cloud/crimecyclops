@@ -29,20 +29,21 @@ admin_checker = RoleChecker(["admin"])
 
 app = FastAPI(title="CrimeCyclops", version="1.0.0")
 
-FRONTEND_DIST = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
-)
+# Resolve frontend dist directory (handles both local dev and Docker container paths)
+_local_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+_docker_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+FRONTEND_DIST = _local_dist if os.path.isdir(_local_dist) else _docker_dist
 
 
 @app.on_event("startup")
 def startup_event():
     init_db()
-    # Initialize chatbot vector store
+    
     if not vector_store_instance.load_from_disk():
         docs = load_all_dataset()
         vector_store_instance.build_index(docs)
 
-# CORS Configuration - Restrict * wildcard for production
+
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000")
 allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
 
@@ -54,12 +55,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Public routes
+
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(public_safety_router.router, prefix="/api")
 
 
-# Authenticated routes (investigators and analysts)
+
 app.include_router(dashboard_router.router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])
 app.include_router(network_router.router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])
 app.include_router(reports_router.router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])
@@ -68,7 +69,7 @@ app.include_router(geo_router.router, prefix="/api", dependencies=[Depends(inves
 app.include_router(analytics_router.router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])
 app.include_router(chatbot_router, prefix="/api", dependencies=[Depends(investigator_analyst_checker)])
 
-# Admin-only operations
+
 app.include_router(ingest_router.router, prefix="/api", dependencies=[Depends(admin_checker)])
 
 
