@@ -2063,6 +2063,65 @@ input {
 }
 
 /* ═══════════════════════════════════════════════
+   NETWORK WORKSPACE COMPONENT STYLING
+═══════════════════════════════════════════════ */
+
+/* Network Map Marker styling */
+.custom-net-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.network-map-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  position: relative;
+  border: 2px solid #ffffff;
+}
+
+.marker-pulse {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border-radius: 50%;
+  border: 1px solid;
+  animation: marker-pulse-glow 1.8s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes marker-pulse-glow {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Network Timeline custom styling */
+.network-timeline-workspace {
+  background: #020617;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.05);
+  border-radius: 8px;
+}
+
+/* Custom Scrollbar for Timeline */
+.network-timeline-workspace ::-webkit-scrollbar {
+  height: 6px;
+}
+.network-timeline-workspace ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+.network-timeline-workspace ::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 3px;
+}
+.network-timeline-workspace ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.5);
+}
+
+
+/* ═══════════════════════════════════════════════
    MAP SCANNING GRID & HOLO SCANLINE
 ═══════════════════════════════════════════════ */
 

@@ -16,6 +16,7 @@ def graph(current_user: dict = Depends(get_current_user)):
                    p.age_band, p.gender, p.occupation,
                    f.id as fir_id, f.crime_type, d.name as district,
                    f.description, f.incident_date, f.status,
+                   f.latitude, f.longitude,
                    cl.relationship_type
             FROM case_links cl
             JOIN persons p ON cl.person_id = p.id
@@ -55,6 +56,8 @@ def graph(current_user: dict = Depends(get_current_user)):
             "description": row["description"],
             "incident_date": row["incident_date"],
             "status": row["status"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
             "case_giver": c_name,
             "case_giver_phone": c_phone,
             "instruments": instrument,
@@ -110,6 +113,8 @@ def graph(current_user: dict = Depends(get_current_user)):
             group="fir",
             node_type="fir",
             district=f["district"],
+            latitude=f["latitude"],
+            longitude=f["longitude"],
         )
 
     # Link co-offenders (persons in the same FIR)
@@ -203,6 +208,8 @@ def graph(current_user: dict = Depends(get_current_user)):
             "group": data.get("group", "unknown"),
             "node_type": data.get("node_type", "unknown"),
             "district": data.get("district", ""),
+            "latitude": data.get("latitude"),
+            "longitude": data.get("longitude"),
             "degree": G.degree(node_id),
             "degree_centrality": round(degree_centrality.get(node_id, 0), 4),
             "betweenness": round(betweenness.get(node_id, 0), 4),

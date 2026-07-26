@@ -7,6 +7,8 @@ import MapAnalysis from './components/MapAnalysis';
 import VoiceControl from './components/VoiceControl';
 import { AIChatbot } from './components/AIChatbot';
 import NetworkGraph from './components/NetworkGraph';
+import NetworkTimeline from './components/NetworkTimeline';
+import NetworkMap from './components/NetworkMap';
 import { AlertDispatchModal } from './components/AlertDispatchModal';
 import { ExecutiveBriefingModal } from './components/ExecutiveBriefingModal';
 
@@ -558,6 +560,7 @@ function NetworkPage() {
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
   const [filterGroups, setFilterGroups] = useState<string[]>(['suspect', 'witness', 'victim', 'accused', 'informer', 'fir', 'unknown']);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [networkViewMode, setNetworkViewMode] = useState<'graph' | 'timeline' | 'map'>('graph');
 
   useEffect(() => {
     document.title = 'CrimeCyclops | Network';
@@ -603,17 +606,55 @@ function NetworkPage() {
       )}
 
       {/* Main workspace */}
-      <div className="network-workspace">
-        {/* Canvas */}
-        <div className="network-canvas-wrap">
-          <NetworkGraph
-            nodes={filteredNodes}
-            links={filteredLinks}
-            selectedNodeId={selectedNode?.id}
-            searchQuery={searchQuery}
-            onNodeClick={setSelectedNode}
-          />
+      <div className="network-workspace-toolbar mb-4 flex justify-between items-center bg-slate-900/60 border border-sky-500/20 px-4 py-2.5 rounded">
+        <span className="text-xs font-bold uppercase tracking-wider text-sky-400">Analyst Perspective Controls</span>
+        <div className="flex gap-2">
+          {[
+            { mode: 'graph', label: '🕸️ Relational Link Graph' },
+            { mode: 'timeline', label: '📅 Chronological Timeline' },
+            { mode: 'map', label: '🗺️ Geospatial Link Map' },
+          ].map(opt => (
+            <button
+              key={opt.mode}
+              className={`px-4 py-1.5 rounded border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                networkViewMode === opt.mode 
+                  ? 'border-sky-500 bg-sky-950/50 text-sky-300 shadow-[0_0_8px_rgba(56,189,248,0.2)]'
+                  : 'border-sky-500/10 bg-transparent text-gray-400 hover:text-sky-400 hover:border-sky-500/30'
+              }`}
+              onClick={() => setNetworkViewMode(opt.mode as any)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      <div className="network-workspace">
+        {/* Canvas or alternate view */}
+        <div className="network-canvas-wrap">
+          {networkViewMode === 'graph' && (
+            <NetworkGraph
+              nodes={filteredNodes}
+              links={filteredLinks}
+              selectedNodeId={selectedNode?.id}
+              searchQuery={searchQuery}
+              onNodeClick={setSelectedNode}
+            />
+          )}
+          {networkViewMode === 'timeline' && (
+            <NetworkTimeline
+              nodes={filteredNodes}
+              links={filteredLinks}
+              onNodeClick={setSelectedNode}
+            />
+          )}
+          {networkViewMode === 'map' && (
+            <NetworkMap
+              nodes={filteredNodes}
+              links={filteredLinks}
+              onNodeClick={setSelectedNode}
+            />
+          )}
         </div>
 
         {/* Sidebar */}
