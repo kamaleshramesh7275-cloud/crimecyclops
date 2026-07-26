@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from dotenv import load_dotenv
+load_dotenv()  # Load .env for local dev (no-op on Render where env vars are injected)
+
 from app.database import init_db
 from app.routers import dashboard as dashboard_router
 from app.routers import ingest as ingest_router

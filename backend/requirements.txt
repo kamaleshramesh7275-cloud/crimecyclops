@@ -10,5 +10,6 @@ PyJWT
 passlib[bcrypt]
 psycopg2-binary
 scikit-learn
+groq
 
 

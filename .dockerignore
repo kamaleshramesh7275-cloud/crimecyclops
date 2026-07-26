@@ -1,0 +1,26 @@
+# Python bytecode
+backend/__pycache__/
+backend/**/__pycache__/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Local SQLite database (use Neon PostgreSQL on Render)
+backend/*.db
+backend/data/
+
+# FAISS index (rebuilt in-memory on startup)
+backend/data/faiss_index/
+
+# Frontend build artifacts and deps (rebuilt in multi-stage)
+frontend/node_modules/
+frontend/dist/
+
+# Git and editor files
+.git/
+.gitignore
+.vscode/
+*.md
+
+# Docker compose (not needed in container)
+docker-compose.yml

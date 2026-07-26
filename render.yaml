@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: crimecyclops
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      # Paste your Neon connection string here in the Render dashboard
+      - key: DATABASE_URL
+        sync: false
+      # Render auto-generates a cryptographically secure JWT secret
+      - key: JWT_SECRET
+        generateValue: true
+      # Paste your free Groq API key (console.groq.com)
+      - key: GROQ_API_KEY
+        sync: false
+      # Set to your Render service URL after first deploy, e.g.:
+      # https://crimecyclops.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: PORT
+        value: "8000"
