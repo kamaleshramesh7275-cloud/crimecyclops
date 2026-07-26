@@ -33,11 +33,13 @@ class postgres_wrapper:
     
     def execute(self, query, vars=None):
         cur = self.conn.cursor()
+        query = query.replace("?", "%s")
         cur.execute(query, vars)
         return cur
         
     def executemany(self, query, vars_list):
         cur = self.conn.cursor()
+        query = query.replace("?", "%s")
         cur.executemany(query, vars_list)
         return cur
         
