@@ -17,7 +17,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
 
 # Groq cloud LLM (free tier) — used as primary LLM when GROQ_API_KEY is set
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
 
 # Chunking & Retrieval
 CHUNK_SIZE = 500

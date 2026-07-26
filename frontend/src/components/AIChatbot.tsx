@@ -29,10 +29,20 @@ interface ChatMessage {
   timestamp: string;
   sources?: SourceCitation[];
   confidence?: number;
-  avatarState?: string;
+  avatarState?: AvatarState;
 }
 
-type AvatarMood = '😊' | '🤔' | '⏳' | '💬' | '🎉' | '⚠️' | '❌';
+type AvatarState = 'idle' | 'searching' | 'reading' | 'generating' | 'success';
+
+const BotIcon = ({ state }: { state: AvatarState }) => {
+  if (state === 'searching') return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
+  if (state === 'reading') return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+  if (state === 'generating') return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
+  if (state === 'success') return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+  
+  // idle shield icon
+  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+};
 
 const SUGGESTED_QUESTIONS = [
   "Cyber fraud incidents in Bengaluru?",
@@ -50,7 +60,7 @@ export const AIChatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchStep, setSearchStep] = useState<string | null>(null);
-  const [avatarMood, setAvatarMood] = useState<AvatarMood>('😊');
+  const [avatarState, setAvatarState] = useState<AvatarState>('idle');
   const [unreadCount, setUnreadCount] = useState(0);
   const [showSourcesForMsg, setShowSourcesForMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -61,9 +71,9 @@ export const AIChatbot: React.FC = () => {
       {
         id: 'msg_welcome',
         sender: 'assistant',
-        text: '👋 **Welcome to CrimeCyclops AI Assistant!**\n\nI am your Karnataka State Police intelligence companion. Ask me anything about FIR records, criminal networks, station workloads, district safety metrics, or court outcomes.',
+        text: 'Welcome to **CrimeCyclops Intelligence Command**.\n\nI am your KSP analytical assistant. Ask me to cross-reference FIR records, workload metrics, court outcomes, or criminal networks.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        avatarState: '😊',
+        avatarState: 'idle',
       },
     ]);
   }, []);
@@ -97,12 +107,12 @@ export const AIChatbot: React.FC = () => {
         {
           id: `msg_${Date.now()}`,
           sender: 'assistant',
-          text: '🧹 *Chat history cleared.* Ask me any question from the Karnataka Crime dataset!',
+          text: 'Memory cleared. Ready for new intelligence queries.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          avatarState: '😊',
+          avatarState: 'idle',
         },
       ]);
-      setAvatarMood('😊');
+      setAvatarState('idle');
     } catch {
       // ignore
     }
@@ -122,20 +132,20 @@ export const AIChatbot: React.FC = () => {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
-    setAvatarMood('🤔');
+    setAvatarState('searching');
 
     // Step 1: Searching knowledge base
-    setSearchStep('🔍 Searching the Karnataka Crime dataset...');
+    setSearchStep('Searching vector database...');
     await new Promise((r) => setTimeout(r, 600));
 
     // Step 2: Reading relevant documents
-    setAvatarMood('⏳');
-    setSearchStep('📖 Reading relevant FIR records & police station data...');
+    setAvatarState('reading');
+    setSearchStep('Retrieving FIR context...');
     await new Promise((r) => setTimeout(r, 700));
 
     // Step 3: Generating response
-    setAvatarMood('💬');
-    setSearchStep('🧠 Synthesizing intelligence response...');
+    setAvatarState('generating');
+    setSearchStep('Synthesizing intelligence report...');
 
     try {
       const resp = await fetch('/api/chat', {
@@ -150,37 +160,32 @@ export const AIChatbot: React.FC = () => {
         throw new Error(data?.detail || 'Failed to reach RAG backend service.');
       }
 
-      let mood: AvatarMood = '🎉';
-      if (data.avatar_state === 'no_answer') mood = '⚠️';
-
-      const assistantMsg: ChatMessage = {
-        id: `ast_${Date.now()}`,
+      const botMsg: ChatMessage = {
+        id: `msg_${Date.now()}`,
         sender: 'assistant',
         text: data.answer,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         sources: data.sources,
         confidence: data.confidence,
-        avatarState: mood,
+        avatarState: 'success',
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
-      setAvatarMood(mood);
+      setMessages((prev) => [...prev, botMsg]);
+      setAvatarState('success');
 
       if (!isOpen) {
         setUnreadCount((prev) => prev + 1);
       }
     } catch (err: any) {
-      setAvatarMood('❌');
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          sender: 'assistant',
-          text: `⚠️ **Service Error**: ${err.message || 'Unable to fetch answer. Please check backend connection.'}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          avatarState: '❌',
-        },
-      ]);
+      const errorMsg: ChatMessage = {
+        id: `err_${Date.now()}`,
+        sender: 'assistant',
+        text: `Error processing query: ${err instanceof Error ? err.message : String(err)}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        avatarState: 'idle',
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      setAvatarState('idle');
     } finally {
       setLoading(false);
       setSearchStep(null);
@@ -259,9 +264,9 @@ export const AIChatbot: React.FC = () => {
         <button
           className="chatbot-fab"
           onClick={handleToggleOpen}
-          title="Open CrimeCyclops AI Assistant"
+          title="Open Intelligence Assistant"
         >
-          <span className="fab-avatar">{avatarMood}</span>
+          <span className="fab-avatar"><BotIcon state={avatarState} /></span>
           <span className="fab-pulse" />
           {unreadCount > 0 && <span className="fab-badge">{unreadCount}</span>}
         </button>
@@ -277,7 +282,7 @@ export const AIChatbot: React.FC = () => {
           {/* Header */}
           <div className="chatbot-header">
             <div className="header-left">
-              <span className="avatar-badge">{avatarMood}</span>
+              <span className="avatar-badge"><BotIcon state={avatarState} /></span>
               <div className="header-info">
                 <span className="header-title">CrimeCyclops AI</span>
                 <span className="header-status">
@@ -324,7 +329,9 @@ export const AIChatbot: React.FC = () => {
                     className={`message-row ${msg.sender === 'user' ? 'user-row' : 'assistant-row'}`}
                   >
                     {msg.sender === 'assistant' && (
-                      <div className="msg-avatar">{msg.avatarState || '😊'}</div>
+                      <div className="msg-avatar-icon">
+                        <BotIcon state={msg.avatarState || 'success'} />
+                      </div>
                     )}
 
                     <div className={`message-bubble ${msg.sender}-bubble`}>
@@ -375,9 +382,9 @@ export const AIChatbot: React.FC = () => {
 
                 {/* Search / Multi-step Progress Animation */}
                 {loading && (
-                  <div className="message-row assistant-row">
-                    <div className="msg-avatar pulse-avatar">{avatarMood}</div>
-                    <div className="message-bubble assistant-bubble loading-bubble">
+                  <div className="message-row assistant-row pending-row">
+                    <div className="msg-avatar-icon pulse-avatar"><BotIcon state={avatarState} /></div>
+                    <div className="message-bubble assistant-bubble typing-bubble">
                       <div className="typing-steps">
                         <span className="spinner-dot" />
                         <span className="step-text">{searchStep}</span>
