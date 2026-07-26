@@ -165,36 +165,34 @@ export default function MapAnalysis() {
       if (!dist.centroid_lat || !dist.centroid_lon) return;
       
       const color = getDistrictColor(dist.total_firs, max);
-      const radiusInMeters = 15000 + (dist.total_firs / max) * 30000;
+      
+      // Calculate a height for the 3D pillar (between 20px and 120px)
+      const normalizedHeight = Math.max(20, (dist.total_firs / max) * 120);
 
-      // Draw sci-fi glowing circles instead of flat filled circles
-      const circle = L.circle([dist.centroid_lat, dist.centroid_lon], {
-        radius: radiusInMeters,
-        fillColor: 'transparent',
-        color: color,
-        weight: 3,
-        opacity: 0.9,
-        className: 'pulse-circle'
+      const htmlContent = `
+        <div class="sci-fi-pillar" style="height: ${normalizedHeight}px; --pillar-color: ${color};">
+          <div class="pillar-top"></div>
+          <div class="pillar-front"></div>
+          <div class="pillar-right"></div>
+        </div>
+      `;
+
+      const marker = L.marker([dist.centroid_lat, dist.centroid_lon], {
+        icon: L.divIcon({
+          className: 'custom-pillar-icon',
+          html: htmlContent,
+          iconSize: [20, normalizedHeight],
+          iconAnchor: [10, normalizedHeight] // Anchor at the bottom of the pillar
+        })
       });
 
-      // Add a smaller dense core
-      const core = L.circle([dist.centroid_lat, dist.centroid_lon], {
-        radius: radiusInMeters * 0.2,
-        fillColor: color,
-        color: 'transparent',
-        fillOpacity: 0.8
-      });
-
-      circle.bindTooltip(
+      marker.bindTooltip(
         `<strong>${isKn ? (dist as any).name_kn || dist.name : dist.name}</strong><br/>FIRs: ${dist.total_firs}`,
         { sticky: true, className: 'custom-tooltip' }
       );
 
-      circle.on('click', () => drillToDistrict(dist));
-      core.on('click', () => drillToDistrict(dist));
-
-      circle.addTo(layerGroup);
-      core.addTo(layerGroup);
+      marker.on('click', () => drillToDistrict(dist));
+      marker.addTo(layerGroup);
     });
 
     layerGroup.addTo(mapRef.current);
@@ -287,20 +285,20 @@ export default function MapAnalysis() {
     { label: 'Fraud', value: 18 }
   ];
 
-  // Mock data for new charts
-  const contrastData = [
-    { name: '2021', open: 400, closed: 240 },
-    { name: '2022', open: 300, closed: 139 },
-    { name: '2023', open: 200, closed: 980 },
-    { name: '2024', open: 278, closed: 390 },
-  ];
+  // Real data for charts based on districts
+  const topDistricts = [...districts].sort((a, b) => b.total_firs - a.total_firs).slice(0, 10);
+  
+  const contrastData = topDistricts.map(d => ({
+    name: d.name.substring(0, 4), // short name for x-axis
+    open: d.open_cases,
+    closed: d.total_firs - d.open_cases
+  }));
 
-  const distributionData = [
-    { name: 'Theft', value: 400, color: '#f43f5e' },
-    { name: 'Cyber', value: 300, color: '#38bdf8' },
-    { name: 'Assault', value: 300, color: '#fbbf24' },
-    { name: 'Drugs', value: 200, color: '#34d399' }
-  ];
+  const distributionData = topDistricts.map((d, i) => ({
+    name: d.name,
+    value: d.total_firs,
+    color: ['#f43f5e', '#38bdf8', '#fbbf24', '#34d399', '#c084fc', '#fb7185', '#60a5fa', '#fcd34d', '#4ade80', '#a78bfa'][i % 10]
+  }));
 
   const curvesData = [
     { name: 'Jan', val1: 40, val2: 24 },
@@ -332,21 +330,21 @@ export default function MapAnalysis() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-blue-900/40 border border-blue-500/30 flex items-center justify-center text-blue-400">📄</div>
+              <div className="w-10 h-10 rounded bg-blue-900/40 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold">F</div>
               <div className="flex flex-col">
                 <span className="text-[10px] text-gray-500 uppercase tracking-widest">Total FIRs</span>
                 <span className="text-xl font-bold text-gray-100">{totalFIRs.toLocaleString()}</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-red-900/40 border border-red-500/30 flex items-center justify-center text-red-400">🚨</div>
+              <div className="w-10 h-10 rounded bg-red-900/40 border border-red-500/30 flex items-center justify-center text-red-400 font-bold">O</div>
               <div className="flex flex-col">
                 <span className="text-[10px] text-gray-500 uppercase tracking-widest">Open Cases</span>
                 <span className="text-xl font-bold text-gray-100">{totalOpen.toLocaleString()}</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400">🏢</div>
+              <div className="w-10 h-10 rounded bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">S</div>
               <div className="flex flex-col">
                 <span className="text-[10px] text-gray-500 uppercase tracking-widest">Stations</span>
                 <span className="text-xl font-bold text-gray-100">{totalStations.toLocaleString()}</span>

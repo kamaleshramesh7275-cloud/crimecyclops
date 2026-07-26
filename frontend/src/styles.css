@@ -1969,3 +1969,95 @@ input {
 .sci-fi-dashboard .leaflet-control-container {
   display: none; /* Hide default leaflet controls to look clean */
 }
+
+/* ═══════════════════════════════════════════════
+   SCI-FI MAP 3D PILLARS (MARKERS)
+═══════════════════════════════════════════════ */
+
+.custom-pillar-icon {
+  background: transparent;
+  border: none;
+}
+
+.sci-fi-pillar {
+  position: relative;
+  width: 14px;
+  /* height set inline via JS */
+  transform-style: preserve-3d;
+  /* isometric tilt */
+  transform: rotateX(60deg) rotateZ(45deg);
+  transform-origin: bottom center;
+}
+
+.sci-fi-pillar > div {
+  position: absolute;
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.2);
+}
+
+.pillar-front {
+  width: 14px;
+  height: 100%;
+  background: var(--pillar-color);
+  opacity: 0.85;
+  transform: rotateX(-90deg);
+  transform-origin: bottom;
+  bottom: 0; left: 0;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+
+.pillar-right {
+  width: 100%;
+  height: 14px;
+  background: var(--pillar-color);
+  opacity: 0.6;
+  transform: rotateY(90deg) rotateZ(-90deg);
+  transform-origin: left bottom;
+  bottom: 0; left: 14px;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+
+.pillar-top {
+  width: 14px;
+  height: 14px;
+  background: var(--pillar-color);
+  opacity: 1;
+  top: 0; left: 0;
+  transform: translateZ(100%); /* the height translates it up, but in isometric we do this differently */
+}
+
+/* Fix for isometric top */
+.sci-fi-pillar .pillar-top {
+  transform: translateZ(var(--pillar-height)); /* Doesn't work well dynamically without JS variable */
+}
+
+/* Better alternative for pure CSS Isometric Pillar using pseudo-elements on a flat div */
+.sci-fi-pillar {
+  width: 12px;
+  background: linear-gradient(to top, rgba(0,0,0,0) 0%, var(--pillar-color) 100%);
+  border-left: 1px solid rgba(255,255,255,0.3);
+  border-right: 1px solid rgba(255,255,255,0.1);
+  transform: none; /* reset */
+  box-shadow: 0 0 15px var(--pillar-color);
+}
+.sci-fi-pillar::before {
+  content: '';
+  position: absolute;
+  top: -4px; left: -1px;
+  width: 12px; height: 6px;
+  background: var(--pillar-color);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 10px #fff;
+}
+.sci-fi-pillar::after {
+  content: '';
+  position: absolute;
+  bottom: -3px; left: -1px;
+  width: 12px; height: 6px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  box-shadow: 0 0 15px var(--pillar-color);
+}
+.sci-fi-pillar .pillar-front, .sci-fi-pillar .pillar-right, .sci-fi-pillar .pillar-top {
+  display: none; /* Hide the complex 3D stuff and use the elegant pseudo-element cylinder */
+}
