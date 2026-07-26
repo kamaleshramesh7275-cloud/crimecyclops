@@ -1,24 +1,23 @@
-# 👁️ CrimeCyclops — Next-Gen Crime Intelligence & Command Center
+# CrimeCyclops — Next-Generation Crime Intelligence & Command Center
 
-*Designed for the KSP Datathon Hackathon. CrimeCyclops is a tactical command center that aggregates case intelligence, maps live spatial crime trends in 3D, performs link analysis between suspects, and parses paper case documents instantly using AI Vision.*
-
----
-
-## 🚀 Presentation Video & Prototype
-- **Live Demo Link**: [Deploy on Render](https://crimecyclops.onrender.com) *(Use admin / admin123 to log in)*
+*Designed for the Karnataka State Police Datathon. CrimeCyclops is an advanced tactical command center that aggregates case intelligence, maps live spatial crime trends in 3D, performs network link analysis, and parses physical case documents using AI Vision.*
 
 ---
 
-## 📖 The Problem
-Police intelligence divisions are overwhelmed by fragmented data pools:
-1. **Paper-heavy workflows**: Hours are wasted manual-typing physical FIR documents and case reports.
-2. **Invisible Links**: Criminal networks remain hidden because manually connecting suspects, witnesses, and vehicles across multiple districts is nearly impossible.
-3. **Flat, Static Mapping**: Conventional 2D crime maps lack direct visual hierarchy, failing to provide immediate spatial awareness to dispatchers.
+## Technical Demonstration
+- **Deployment Platform**: [CrimeCyclops on Render](https://crimecyclops.onrender.com) *(Access credentials: admin / admin123)*
 
 ---
 
-## ⚡ The CrimeCyclops Solution
-CrimeCyclops bridges the gap between physical documentation and predictive spatial action:
+## Problem Statement
+Modern police intelligence divisions are challenged by fragmented, unstructured data sources:
+1. **Paper-Driven Workflows**: Valuable hours are expended manually transcribing physical First Information Reports (FIRs) and case documents.
+2. **Undetected Associations**: Relational links between suspects, witnesses, and vehicles across multiple jurisdictions remain undetected due to the limitations of manual lookup.
+3. **Static Mapping**: Traditional two-dimensional crime maps fail to convey density or frequency hierarchy, limiting immediate situational awareness for dispatchers.
+
+---
+
+## Platform Architecture
 
 ```mermaid
 flowchart TD
@@ -27,7 +26,7 @@ flowchart TD
     User -->|Interacts| UI[Vite React Command Center]
 
     %% Frontend & Visualizers
-    subgraph UI_Panels [React Glassmorphic Frontend]
+    subgraph UI_Panels [React Frontend]
         3DMap[3D Isometric Heatmap]
         Network[Dynamic Link Analysis Graph]
         Chatbot[RAG AI Intelligence Assistant]
@@ -52,41 +51,41 @@ flowchart TD
 
 ---
 
-## 🌟 Core Datathon Features
+## Core Capabilities
 
-### 1. 📷 AI-Powered Photo Case Ingester (Vision OCR)
-- **Problem Solved**: Manual data entry of case documents.
-- **How it works**: Drag-and-drop a photo of a physical FIR or handwritten case document. CrimeCyclops calls the **Groq Llama-3.2-11b-vision** model to scan the document, structure the metadata (District, Station, Crime Type, IPC, Date, Status, Description), and auto-populate the review form.
-- **Failover Safe**: Runs with a rule-based mock parser fallback if no API key is provided, guaranteeing 100% hackathon demo runtime.
-- **Instant Map Synced**: Clicking "Save Record" commits it to the database, instantly updating the 3D map indicators.
+### 1. Document Ingestion (AI Vision OCR)
+- **Application**: Eliminates manual data entry of printed or handwritten case files.
+- **Process**: Users upload an image of an FIR document. The system utilizes the **Groq Llama-3.2-11b-vision** model to extract key fields (District, Station, Crime Type, IPC Section, Incident Date, Status, Description) into structured JSON.
+- **Resilience**: Features a local fallback parser that processes metadata from filename headers in the absence of an API key.
+- **Synchronization**: Saving parsed records updates the database, prompting Leaflet to render the case position immediately.
 
-### 2. 🗺️ Holographic 3D Map Visualization
-- **Aesthetic**: Modern cyberpunk tactical layout flanking the central map with analytical charts (Donut, Bar, Line, Radar charts powered by Recharts).
-- **3D Isometric Columns**: Replaced flat pins with vertical CSS-animated cylinders. The height and glow color of each cylinder correspond to the volume of crime in that district, creating a high-contrast tactical heatmap.
-- **Geographic Coverage**: Fully loaded with outline boundaries of Karnataka's major districts. 
-- **Scanning Effect**: Interactive map overlays with animated vertical scanlines and a glowing targeting radar grid.
+### 2. 3D Isometric Mapping
+- **Interface**: Glassmorphic layout flanking a central Leaflet container, utilizing Recharts for data density analytics (Donut, Bar, Line, and Radar components).
+- **Data Rendering**: Employs CSS-styled vertical cylinders instead of traditional flat markers. Height and glow intensity are mapped to district crime density.
+- **Geographic Coverage**: Displays spatial district boundary overlays for all major districts in Karnataka.
+- **Tactical Effects**: Includes scanlines and background grid alignment overlays to simulate tactical dashboards.
 
-### 3. 🕸️ Dynamic Link (Network) Analysis Graph
-- **Suspect Connection mapping**: Builds real-time relational node graphs (using SVG rendering) mapping links between Victims, Suspects, Witnesses, and active FIRs.
-- **Interactive Highlighting**: Clicking any node highlights its first-degree connections and opens a side drawer summarizing detailed relationships.
-- **Anomaly Detection**: Flags high-weight connections (e.g., a witness appearing in 3+ unrelated drug cases).
+### 3. Link Analysis Engine (Network Graph)
+- **Relational Mapping**: Generates dynamic node graphs (SVG-based) representing interactions between Suspects, Victims, Witnesses, and FIR cases.
+- **Context Highlighting**: Clicking any node centers first-degree relationships and loads case summaries in an inspector drawer.
+- **Anomaly Detection**: Evaluates node degree centrality to flag repeat suspects or witness crossover instances.
 
-### 4. 💬 RAG-Powered AI Intelligence Chatbot
-- **Natural Language Querying**: Analysts can query cases locally (e.g., *"Show me all drug cases in Mangaluru from last month"*).
-- **Vector Indexing**: Integrates **FAISS** vector store using Sentence Transformers (`all-MiniLM-L6-v2`) to perform semantic search across case records.
+### 4. Semantic Search (RAG Chatbot)
+- **Natural Language Parsing**: Allows analysts to search for past events using conversational queries.
+- **Information Retrieval**: Indexes case summaries into a **FAISS** vector store using Sentence Transformers (`all-MiniLM-L6-v2`) for semantic search.
 
 ---
 
-## 🛠️ Technology Stack
-- **Frontend**: React, TypeScript, Leaflet, Recharts, CSS Variables (Custom themes).
-- **Backend**: FastAPI (Python), SQLite (optimized with a custom PostgreSQL wrapper layer for scalability), FAISS Vector Database.
+## Technology Stack
+- **Frontend**: Vite, React, TypeScript, Leaflet, Recharts, CSS Variables.
+- **Backend**: FastAPI (Python), SQLite (optimized with a custom PostgreSQL compatibility wrapper), FAISS.
 - **AI Models**: Groq Cloud API (`llama-3.2-11b-vision-preview`), HuggingFace Sentence Transformers (`all-MiniLM-L6-v2`).
 
 ---
 
-## ⚙️ Local Installation & Setup
+## Installation & Deployment
 
-1. **Clone & Setup Backend**
+1. **Configure Backend Environment**
    ```bash
    cd backend
    python -m venv venv
@@ -94,32 +93,32 @@ flowchart TD
    pip install -r requirements.txt
    ```
 
-2. **Seed 16,000 High-Contrast Cases**
-   This script builds the database, generates 16,000 mock cases with varied district intensities, and indexes the FAISS chatbot:
+2. **Generate Threat-Weighted Dataset**
+   Populate the database with 16,000 mock cases across all 31 Karnataka districts and index the chatbot's vector store:
    ```bash
    python -c "import sys; sys.path.append('backend'); from app.seed_data import seed_demo_data; seed_demo_data()"
    ```
 
-3. **Start the Backend Server**
+3. **Launch Backend Service**
    ```bash
    python -m uvicorn app.main:app --reload
    ```
 
-4. **Start the Frontend Development Server**
+4. **Initialize Frontend Application**
    ```bash
    cd ../frontend
    npm install
    npm run dev
    ```
 
-5. **Access the Platform**
-   Open `http://localhost:5173` and log in with:
+5. **Authentication Credentials**
+   Navigate to `http://localhost:5173` and log in:
    - **Username**: `admin`
    - **Password**: `admin123`
 
 ---
 
-## 🔮 Future Roadmaps
-- **PostGIS Integration**: Elevate from centroid averages to full spatial district polygon intersection database queries.
-- **KDE Risk Predictor**: Train kernel density estimation models on historical coordinates to output actual dynamic crime hotspots.
-- **Automated Vehicle ANPR Tracking**: Link automated license plate readers directly to the network analysis suspect drawer.
+## Project Roadmap
+- **PostGIS Extension**: Move from centroid plotting to spatial polygon intersection queries.
+- **Kernel Density Estimation**: Implement predictive crime mapping using KDE algorithms.
+- **ANPR System Integration**: Link license plate reader databases to the relational graph engine.
