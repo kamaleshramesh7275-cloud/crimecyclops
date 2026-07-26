@@ -14,10 +14,13 @@ router = APIRouter(tags=["analytics"])
 def predictive_risk(current_user: dict = Depends(get_current_user)):
     """Generate geospatial predictive risk scores using Gaussian Kernel Density Estimation (KDE) and trend projection."""
     conn = get_db_connection()
+    # Limit to 2500 recent records to prevent O(N*M) KDE calculation from freezing the server
     firs = conn.execute("""
         SELECT latitude, longitude, incident_date 
         FROM fir_records 
         WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        ORDER BY incident_date DESC
+        LIMIT 2500
     """).fetchall()
     conn.close()
 
