@@ -68,7 +68,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
-    except PyJWTError:
+    except jwt.PyJWTError:
         raise credentials_exception
         
     user = get_user_from_db(username)

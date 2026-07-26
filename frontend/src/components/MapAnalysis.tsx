@@ -57,6 +57,15 @@ function getDistrictColor(count: number, max: number): string {
   return '#34d399'; // Emerald 400 (neon green)
 }
 
+function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = localStorage.getItem('token');
+  const headers = new Headers(options.headers || {});
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(url, { ...options, headers });
+}
+
 export default function MapAnalysis() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -102,7 +111,7 @@ export default function MapAnalysis() {
     if (crimeFilter !== 'All') url += `crime_type=${encodeURIComponent(crimeFilter)}&`;
     if (statusFilter !== 'All') url += `status=${encodeURIComponent(statusFilter)}&`;
     
-    fetch(url)
+    authFetch(url)
       .then((r) => r.json())
       .then((data) => setDistricts(data.districts || []));
   };
@@ -116,12 +125,12 @@ export default function MapAnalysis() {
       .then(setGeoJson);
       
     // Fetch live feed
-    fetch('/api/dashboard/recent-activity')
+    authFetch('/api/dashboard/recent-activity')
       .then((r) => r.json())
       .then((data) => setRecentActivities(data.recent || []));
   }, []);
 
-  // Initialize map once
+  // Initialize map once, with tile layer baked in
   useEffect(() => {
     if (!mapDivRef.current || mapRef.current) return;
     const map = L.map(mapDivRef.current, {
@@ -129,26 +138,38 @@ export default function MapAnalysis() {
       zoom: 7,
       zoomControl: true,
     });
+
+    // Add tile layer immediately during map creation
+    tileLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap contributors, © CARTO',
+      maxZoom: 19,
+    }).addTo(map);
     
     stationLayersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    // Multiple invalidateSize calls to handle CSS layout timing
+    setTimeout(() => map.invalidateSize(), 100);
+    setTimeout(() => map.invalidateSize(), 500);
+    setTimeout(() => map.invalidateSize(), 1500);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
   }, []);
 
-  // Handle terrain tile layer updates dynamically
+  // Handle terrain tile layer toggle
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !tileLayerRef.current) return;
     if (showTerrain) {
-      if (!tileLayerRef.current) {
-        tileLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-          attribution: '© OpenStreetMap contributors, © CARTO',
-          maxZoom: 19,
-        });
+      if (!mapRef.current.hasLayer(tileLayerRef.current)) {
+        tileLayerRef.current.addTo(mapRef.current);
       }
-      tileLayerRef.current.addTo(mapRef.current);
     } else {
-      if (tileLayerRef.current) {
-        tileLayerRef.current.remove();
-      }
+      tileLayerRef.current.remove();
     }
   }, [showTerrain]);
 
@@ -164,7 +185,7 @@ export default function MapAnalysis() {
       if (crimeFilter !== 'All') url += `crime_type=${encodeURIComponent(crimeFilter)}&`;
       if (statusFilter !== 'All') url += `status=${encodeURIComponent(statusFilter)}&`;
 
-      fetch(url)
+      authFetch(url)
         .then((r) => r.json())
         .then((data) => {
           const stations: StationSummary[] = data.stations || [];
@@ -434,7 +455,7 @@ export default function MapAnalysis() {
           <div className="photo-ingester-content">
             <div className="flex justify-between items-center border-b border-sky-500/20 px-6 py-4 bg-slate-900/50">
               <h2 className="text-sky-400 font-bold uppercase tracking-wider flex items-center gap-2">
-                <span>📷</span> AI Case Photo Ingester
+                AI Case Photo Ingester
               </h2>
               <button 
                 className="text-gray-400 hover:text-sky-400 transition-colors text-xl font-bold cursor-pointer"
@@ -482,7 +503,7 @@ export default function MapAnalysis() {
                         }
                       }}
                     />
-                    <div className="text-4xl mb-3">📁</div>
+                    <div className="text-sky-400 font-bold uppercase tracking-wider text-sm mb-3">Drop Document Here</div>
                     <div className="text-sky-400 font-bold uppercase tracking-wider text-sm">Upload Case Photo / FIR Document</div>
                     <div className="text-[10px] text-gray-500 mt-2">Supports JPG, PNG, WEBP. Drag and drop file or click to browse.</div>
                   </label>
@@ -490,7 +511,7 @@ export default function MapAnalysis() {
               ) : isParsing ? (
                 <div className="flex-1 flex flex-col justify-center items-center gap-4">
                   <div className="scanner-loader w-full max-w-sm">
-                    <div className="text-3xl animate-pulse">📷</div>
+                    <div className="text-sky-400 font-bold text-xs uppercase tracking-widest animate-pulse mb-3">Analyzing...</div>
                     <div className="text-sky-400 font-bold text-xs uppercase tracking-widest">{ingesterMessage}</div>
                     <div className="scanner-bar"></div>
                   </div>
@@ -615,7 +636,7 @@ export default function MapAnalysis() {
                     setSaveLoading(true);
                     setIngesterMessage("Saving case details to intelligence database...");
                     
-                    fetch('/api/geo/save-parsed-case', {
+                    authFetch('/api/geo/save-parsed-case', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(parsedData)
@@ -657,13 +678,13 @@ export default function MapAnalysis() {
                 setIngesterMessage("");
               }}
            >
-              📷 Case Photo Scanner
+              Case Photo Scanner
            </button>
         </div>
         <div className="sci-fi-map-container" style={{ overflow: 'hidden' }}>
-          {showGrid && <div className="map-scanner-grid"></div>}
-          {showScanner && <div className="map-scanner-line"></div>}
-          <div className="w-full h-full" ref={mapDivRef} />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }} ref={mapDivRef} />
+          {showGrid && <div className="map-scanner-grid" style={{ zIndex: 2 }}></div>}
+          {showScanner && <div className="map-scanner-line" style={{ zIndex: 2 }}></div>}
         </div>
 
         {/* Floating Interactive Controls & Legend */}

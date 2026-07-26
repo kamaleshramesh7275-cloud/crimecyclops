@@ -44,7 +44,7 @@ export default function VoiceControl() {
 
     recognition.onresult = (event: any) => {
       const text = event.results[0][0].transcript.trim().toLowerCase();
-      setTranscript(`🗣️ ${text}`);
+      setTranscript(`Command: ${text}`);
       setShowToast(true);
       processCommand(text);
     };

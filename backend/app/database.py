@@ -202,6 +202,9 @@ def init_postgres():
         );
 
         CREATE INDEX IF NOT EXISTS idx_fir_station_date ON fir_records(station_id, incident_date);
+        CREATE INDEX IF NOT EXISTS idx_fir_district_id ON fir_records(district_id);
+        CREATE INDEX IF NOT EXISTS idx_fir_crime_type ON fir_records(crime_type);
+        CREATE INDEX IF NOT EXISTS idx_stations_district_id ON stations(district_id);
         CREATE INDEX IF NOT EXISTS idx_case_links_fir ON case_links(fir_id);
         CREATE INDEX IF NOT EXISTS idx_case_links_person ON case_links(person_id);
     """)
@@ -325,6 +328,9 @@ def init_sqlite():
 
         CREATE INDEX IF NOT EXISTS idx_fir_station_date ON fir_records(station_id, incident_date);
         CREATE INDEX IF NOT EXISTS idx_fir_location ON fir_records(latitude, longitude);
+        CREATE INDEX IF NOT EXISTS idx_fir_district_id ON fir_records(district_id);
+        CREATE INDEX IF NOT EXISTS idx_fir_crime_type ON fir_records(crime_type);
+        CREATE INDEX IF NOT EXISTS idx_stations_district_id ON stations(district_id);
         CREATE INDEX IF NOT EXISTS idx_case_links_fir ON case_links(fir_id);
         CREATE INDEX IF NOT EXISTS idx_case_links_person ON case_links(person_id);
         """
