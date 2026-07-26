@@ -12,11 +12,22 @@ def overview():
     stations = conn.execute("SELECT COUNT(*) AS total_stations FROM stations").fetchone()
     open_cases = conn.execute("SELECT COUNT(*) AS open_cases FROM fir_records WHERE status != 'closed'").fetchone()
     closed_cases_row = conn.execute("SELECT COUNT(*) AS closed_cases FROM fir_records WHERE status = 'closed'").fetchone()
-    avg_res = conn.execute("""
-        SELECT AVG(julianday('now') - julianday(substr(incident_date,1,10))) AS avg_days
-        FROM fir_records WHERE status = 'closed'
-    """).fetchone()
+    closed_cases_dates = conn.execute("SELECT incident_date FROM fir_records WHERE status = 'closed'").fetchall()
     conn.close()
+
+    from datetime import datetime
+    total_days = 0
+    valid_cases = 0
+    now = datetime.now()
+    for row in closed_cases_dates:
+        try:
+            inc_date_str = str(row["incident_date"])[:10]
+            inc_date = datetime.strptime(inc_date_str, "%Y-%m-%d")
+            total_days += (now - inc_date).days
+            valid_cases += 1
+        except Exception:
+            pass
+    avg_days = total_days / valid_cases if valid_cases > 0 else 0
 
     total = totals["total_firs"] or 1
     closed = closed_cases_row["closed_cases"] or 0
@@ -29,7 +40,7 @@ def overview():
         "open_cases": open_cases["open_cases"],
         "closed_cases": closed,
         "closure_rate_pct": closure_rate,
-        "avg_resolution_days": round(avg_res["avg_days"] or 0, 1),
+        "avg_resolution_days": round(avg_days, 1),
     }
 
 
