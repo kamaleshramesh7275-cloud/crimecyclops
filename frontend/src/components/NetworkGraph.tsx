@@ -299,25 +299,28 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
 
         // Draw Square Node Background
         drawRoundRect(ctx, x, y, size, size, 8);
-        ctx.fillStyle = '#1f2937'; // gray-800
         
         if (isHighlighted || isSelected || isSearched) {
             ctx.shadowBlur = 20;
             ctx.shadowColor = baseColor;
             ctx.strokeStyle = baseColor;
             ctx.lineWidth = 3;
-            // Add a subtle tint of the base color to the background
+            // Add a stronger tint of the base color to the background
             ctx.fillStyle = baseColor; 
-            ctx.globalAlpha = 0.2;
+            ctx.globalAlpha = 0.35;
             ctx.fill();
             ctx.globalAlpha = 1.0;
         } else {
             ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#374151'; // gray-700
+            ctx.strokeStyle = baseColor; // Use vibrant border instead of gray
             ctx.lineWidth = 1.5;
+            // Always-On vibrant color tint
+            ctx.fillStyle = baseColor;
+            ctx.globalAlpha = 0.15;
+            ctx.fill();
+            ctx.globalAlpha = isFaded ? 0.2 : 1.0;
         }
         
-        ctx.fill(); // fill bg
         ctx.stroke(); // draw border
         
         ctx.shadowBlur = 0; // reset
@@ -460,8 +463,10 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         className="block w-full h-full cursor-grab active:cursor-grabbing"
       />
 
-      <div className="absolute top-4 left-4 bg-gray-800/90 p-4 rounded-xl border border-gray-700 backdrop-blur-md pointer-events-none shadow-xl">
-          <div className="text-sm font-bold text-gray-100 mb-3 tracking-wide">FORCE NETWORK LEGEND</div>
+      <div className="absolute top-4 left-4 bg-gray-800/90 p-4 rounded-xl border border-gray-700 backdrop-blur-md shadow-xl z-10 pointer-events-auto">
+          <div className="text-sm font-bold text-gray-100 mb-3 tracking-wide flex justify-between items-center">
+              FORCE NETWORK LEGEND
+          </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             {Object.entries(GROUP_COLORS).map(([role, color]) => (
                 <div key={role} className="flex items-center gap-2">
@@ -474,6 +479,50 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
               Hover to view exact paths
           </div>
       </div>
+
+      {selectedNodeId && (
+          <div className="absolute top-4 right-4 bottom-4 w-80 bg-gray-800/95 p-6 rounded-xl border border-gray-700 backdrop-blur-xl shadow-2xl z-10 pointer-events-auto overflow-y-auto transform transition-all translate-x-0 duration-300 flex flex-col">
+              {(() => {
+                  const sNode = nodes.find(n => n.id === selectedNodeId);
+                  if (!sNode) return null;
+                  const bColor = GROUP_COLORS[sNode.group.toLowerCase()] || GROUP_COLORS.unknown;
+                  return (
+                      <>
+                        <div className="pb-5 mb-5 border-b border-gray-700">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl" style={{ backgroundColor: `${bColor}20`, color: bColor, border: `1px solid ${bColor}50` }}>
+                                    {sNode.node_type === 'FIR' ? '📄' : '👤'}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-100">{sNode.label}</h2>
+                                    <div className="text-xs uppercase tracking-widest font-bold" style={{ color: bColor }}>{sNode.node_type} - {sNode.group}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3 flex-1">
+                            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/50 flex justify-between items-center">
+                                <span className="text-gray-400 text-sm font-medium">Direct Connections</span>
+                                <span className="text-gray-100 font-bold text-lg">{sNode.degree}</span>
+                            </div>
+                            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/50 flex justify-between items-center">
+                                <span className="text-gray-400 text-sm font-medium">Network Centrality</span>
+                                <span className="text-gray-100 font-bold text-lg">{(sNode.degree_centrality * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/50 flex flex-col gap-1">
+                                <span className="text-gray-400 text-sm font-medium">Primary District</span>
+                                <span className="text-gray-100 font-bold">{sNode.district || 'Unknown Jurisdiction'}</span>
+                            </div>
+                            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/50 flex flex-col gap-1">
+                                <span className="text-gray-400 text-sm font-medium">System ID</span>
+                                <span className="text-gray-500 font-mono text-xs break-all">{sNode.id}</span>
+                            </div>
+                        </div>
+                      </>
+                  );
+              })()}
+          </div>
+      )}
     </div>
   );
 }
