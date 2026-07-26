@@ -90,6 +90,13 @@ export default function MapAnalysis() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [ingesterMessage, setIngesterMessage] = useState("");
 
+  // Tactical Map Settings
+  const [showTerrain, setShowTerrain] = useState(true);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showScanner, setShowScanner] = useState(true);
+
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+
   const refreshData = () => {
     let url = '/api/geo/districts?';
     if (crimeFilter !== 'All') url += `crime_type=${encodeURIComponent(crimeFilter)}&`;
@@ -122,15 +129,28 @@ export default function MapAnalysis() {
       zoom: 7,
       zoomControl: true,
     });
-    // Restore Dark Matter Tactical Map Tiles for geographical context
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap contributors, © CARTO',
-      maxZoom: 19,
-    }).addTo(map);
     
     stationLayersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
   }, []);
+
+  // Handle terrain tile layer updates dynamically
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (showTerrain) {
+      if (!tileLayerRef.current) {
+        tileLayerRef.current = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+          attribution: '© OpenStreetMap contributors, © CARTO',
+          maxZoom: 19,
+        });
+      }
+      tileLayerRef.current.addTo(mapRef.current);
+    } else {
+      if (tileLayerRef.current) {
+        tileLayerRef.current.remove();
+      }
+    }
+  }, [showTerrain]);
 
   // Fetch Districts data when filters change
   useEffect(() => {
@@ -641,9 +661,71 @@ export default function MapAnalysis() {
            </button>
         </div>
         <div className="map-scanner-container relative w-full h-full">
-          <div className="map-scanner-grid"></div>
-          <div className="map-scanner-line"></div>
+          {showGrid && <div className="map-scanner-grid"></div>}
+          {showScanner && <div className="map-scanner-line"></div>}
           <div className="w-full h-full" ref={mapDivRef} />
+        </div>
+
+        {/* Floating Interactive Controls & Legend */}
+        <div className="absolute bottom-6 left-6 z-[400] flex flex-col gap-3 pointer-events-none">
+          {/* Map Layer Switcher */}
+          <div className="pointer-events-auto bg-slate-950/80 backdrop-blur-md border border-sky-500/30 p-3 rounded-lg shadow-[0_0_15px_rgba(56,189,248,0.15)] flex flex-col gap-2 w-48">
+            <span className="text-[9px] text-sky-400 uppercase tracking-widest font-bold">Tactical Overlays</span>
+            <label className="flex items-center gap-2 text-xs text-gray-200 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={showTerrain} 
+                onChange={(e) => setShowTerrain(e.target.checked)} 
+                className="accent-sky-500"
+              />
+              Show Base Terrain
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-200 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={showGrid} 
+                onChange={(e) => setShowGrid(e.target.checked)} 
+                className="accent-sky-500"
+              />
+              Show Grid Matrix
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-200 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={showScanner} 
+                onChange={(e) => setShowScanner(e.target.checked)} 
+                className="accent-sky-500"
+              />
+              Active Radar Sweep
+            </label>
+          </div>
+
+          {/* Map Legend */}
+          <div className="pointer-events-auto bg-slate-950/80 backdrop-blur-md border border-sky-500/30 p-3 rounded-lg shadow-[0_0_15px_rgba(56,189,248,0.15)] flex flex-col gap-2 w-48">
+            <span className="text-[9px] text-sky-400 uppercase tracking-widest font-bold">Crime Severity</span>
+            <div className="flex flex-col gap-1.5 text-[10px] text-gray-300">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#f43f5e] shadow-[0_0_8px_#f43f5e]"></div>
+                <span>Critical Risk (&gt;80%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#fb923c] shadow-[0_0_8px_#fb923c]"></div>
+                <span>High Risk (60% - 80%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#fbbf24] shadow-[0_0_8px_#fbbf24]"></div>
+                <span>Medium Risk (40% - 60%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#c084fc] shadow-[0_0_8px_#c084fc]"></div>
+                <span>Low Risk (20% - 40%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#34d399] shadow-[0_0_8px_#34d399]"></div>
+                <span>Negligible Risk (&lt;20%)</span>
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* GeoHierarchy Breadcrumb (Sci-Fi Style) */}
