@@ -68,9 +68,10 @@ def get_districts(
         dist_dict["top_crime_count"] = top["cnt"] if top else 0
 
         # Station count
-        dist_dict["station_count"] = conn.execute(
-            "SELECT COUNT(*) FROM stations WHERE district_id = ?", (row["id"],)
-        ).fetchone()[0]
+        station_count = conn.execute(
+            "SELECT COUNT(*) as count FROM stations WHERE district_id = ?", (row["id"],)
+        ).fetchone()
+        dist_dict["station_count"] = station_count["count"] if station_count else 0
 
         result.append(dist_dict)
 
