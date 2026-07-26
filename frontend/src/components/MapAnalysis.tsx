@@ -98,11 +98,11 @@ export default function MapAnalysis() {
       zoom: 7,
       zoomControl: true,
     });
-    // Dark Matter Tactical Map Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap contributors, © CARTO',
-      maxZoom: 19,
-    }).addTo(map);
+    // No base map tiles! Keep it completely dark/holographic
+    // L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    //   attribution: '© OpenStreetMap contributors, © CARTO',
+    //   maxZoom: 19,
+    // }).addTo(map);
     
     stationLayersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
@@ -136,30 +136,48 @@ export default function MapAnalysis() {
     }
   }, [crimeFilter, statusFilter, activeDistrict, level]);
 
-  // Render bubble map when districts are loaded
+  // Render holographic bubble map when districts are loaded
   useEffect(() => {
-    if (!mapRef.current || districts.length === 0) return;
+    if (!mapRef.current || districts.length === 0 || !geoJson) return;
     if (geoLayerRef.current) geoLayerRef.current.remove();
 
     const max = Math.max(...districts.map((d) => d.total_firs));
     const layerGroup = L.featureGroup();
 
+    // Draw the GeoJSON state/district boundaries first
+    L.geoJSON(geoJson, {
+      style: {
+        color: '#38bdf8', // Neon blue
+        weight: 1.5,
+        opacity: 0.6,
+        fillColor: '#0a0f26',
+        fillOpacity: 0.4,
+        dashArray: '4 4'
+      }
+    }).addTo(layerGroup);
+
     districts.forEach(dist => {
       if (!dist.centroid_lat || !dist.centroid_lon) return;
       
       const color = getDistrictColor(dist.total_firs, max);
-      // Use geographic radius (meters) so the circle doesn't shrink when zooming in.
-      // Base radius of 15km, scaling up to 45km based on crime count.
       const radiusInMeters = 15000 + (dist.total_firs / max) * 30000;
 
+      // Draw sci-fi glowing circles instead of flat filled circles
       const circle = L.circle([dist.centroid_lat, dist.centroid_lon], {
         radius: radiusInMeters,
-        fillColor: color,
+        fillColor: 'transparent',
         color: color,
-        weight: 2,
-        opacity: 0.8,
-        fillOpacity: 0.35,
+        weight: 3,
+        opacity: 0.9,
         className: 'pulse-circle'
+      });
+
+      // Add a smaller dense core
+      const core = L.circle([dist.centroid_lat, dist.centroid_lon], {
+        radius: radiusInMeters * 0.2,
+        fillColor: color,
+        color: 'transparent',
+        fillOpacity: 0.8
       });
 
       circle.bindTooltip(
@@ -167,24 +185,16 @@ export default function MapAnalysis() {
         { sticky: true, className: 'custom-tooltip' }
       );
 
-      circle.on('click', () => {
-        drillToDistrict(dist);
-      });
-
-      circle.on('mouseover', () => {
-        circle.setStyle({ fillOpacity: 0.6, weight: 3 });
-      });
-
-      circle.on('mouseout', () => {
-        circle.setStyle({ fillOpacity: 0.3, weight: 2 });
-      });
+      circle.on('click', () => drillToDistrict(dist));
+      core.on('click', () => drillToDistrict(dist));
 
       circle.addTo(layerGroup);
+      core.addTo(layerGroup);
     });
 
     layerGroup.addTo(mapRef.current);
     geoLayerRef.current = layerGroup as any;
-  }, [districts, isKn]);
+  }, [districts, isKn, geoJson]);
 
   function drillToDistrict(dist: DistrictSummary) {
     setActiveDistrict(dist);
@@ -258,103 +268,151 @@ export default function MapAnalysis() {
     setActiveStationId(null);
   };
 
+  // Data aggregations for the panels
+  const totalFIRs = districts.reduce((acc, d) => acc + d.total_firs, 0);
+  const totalOpen = districts.reduce((acc, d) => acc + d.open_cases, 0);
+  const totalStations = districts.reduce((acc, d) => acc + d.station_count, 0);
+  
+  const topDistricts = [...districts].sort((a, b) => b.total_firs - a.total_firs).slice(0, 5);
+  const radarData = [
+    { label: 'Theft', value: 34 },
+    { label: 'Cyber', value: 21 },
+    { label: 'Assault', value: 15 },
+    { label: 'Drugs', value: 12 },
+    { label: 'Fraud', value: 18 }
+  ];
+
   return (
-    <div className="map-page">
-      <GeoHierarchy
-        level={level}
-        districts={districts}
-        activeDistrict={activeDistrict}
-        stations={activeStations}
-        onSelectDistrict={drillToDistrict}
-        onSelectStation={(st) => {
-          setActiveStationId(st.id);
-          setLevel('station');
-          setDrawerOpen(true);
-        }}
-        onBack={goBack}
-      />
-
-      <div className="map-container" ref={mapDivRef} />
-
-      {/* Floating Filter Bar - Glassmorphic */}
-      <div className="absolute top-4 right-4 bg-gray-800/90 backdrop-blur-md border border-gray-700 p-4 rounded-xl shadow-xl z-[400] flex gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{isKn ? 'ಅಪರಾಧದ ಪ್ರಕಾರ' : 'Crime Type'}</span>
-          <select className="bg-gray-900/80 border border-gray-600 text-gray-200 text-sm rounded-lg p-2 outline-none" value={crimeFilter} onChange={e => setCrimeFilter(e.target.value)}>
-            <option value="All">{isKn ? 'ಎಲ್ಲಾ' : 'All'}</option>
-            <option value="Theft">{isKn ? 'ಕಳ್ಳತನ (Theft)' : 'Theft'}</option>
-            <option value="Burglary">{isKn ? 'ಕನ್ನ (Burglary)' : 'Burglary'}</option>
-            <option value="Assault">{isKn ? 'ಹಲ್ಲೆ (Assault)' : 'Assault'}</option>
-            <option value="Cyber Fraud">{isKn ? 'ಸೈಬರ್ ವಂಚನೆ (Cyber Fraud)' : 'Cyber Fraud'}</option>
-            <option value="Drug Trafficking">{isKn ? 'ಮಾದಕವಸ್ತು ಸಾಗಣೆ (Drugs)' : 'Drug Trafficking'}</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{isKn ? 'ಸ್ಥಿತಿ' : 'Status'}</span>
-          <select className="bg-gray-900/80 border border-gray-600 text-gray-200 text-sm rounded-lg p-2 outline-none" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="All">{isKn ? 'ಎಲ್ಲಾ' : 'All'}</option>
-            <option value="Open">{isKn ? 'ತೆರೆದ (Open)' : 'Open'}</option>
-            <option value="Closed">{isKn ? 'ಮುಚ್ಚಿದ (Closed)' : 'Closed'}</option>
-          </select>
-        </div>
-      </div>
-
-      <StationDrawer
-        stationId={activeStationId}
-        open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-          setActiveStationId(null);
-        }}
-      />
-
-      {/* Glassmorphic Legend */}
-      <div className="absolute bottom-6 right-4 bg-gray-800/90 backdrop-blur-md border border-gray-700 p-4 rounded-xl shadow-xl z-[400]">
-        <div className="text-sm font-bold text-gray-100 mb-3 tracking-wide uppercase">{t('crimeIntensity', 'Crime Intensity')}</div>
-        <div className="flex flex-col gap-2">
-          {[
-            { color: '#f43f5e', label: t('veryHigh', 'Very High') },
-            { color: '#fb923c', label: t('high', 'High') },
-            { color: '#fbbf24', label: t('medium', 'Medium') },
-            { color: '#c084fc', label: t('low', 'Low') },
-            { color: '#34d399', label: t('veryLow', 'Very Low') },
-          ].map(({ color, label }) => (
-            <div key={color} className="flex items-center gap-3">
-              <span className="w-3 h-3 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-              <span className="text-xs font-semibold text-gray-300">{label}</span>
+    <div className="sci-fi-dashboard">
+      
+      {/* LEFT COLUMN */}
+      <div className="sci-fi-col-left">
+        <div className="sci-fi-panel" style={{ flex: 1 }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Statistic Overview</span>
+          </div>
+          <div className="sci-fi-stat-row">
+            <div className="sci-fi-stat-icon">📄</div>
+            <div className="sci-fi-stat-info">
+              <div className="sci-fi-stat-label">Total FIRs</div>
+              <div className="sci-fi-stat-value text-blue-400">{totalFIRs.toLocaleString()}</div>
             </div>
-          ))}
+          </div>
+          <div className="sci-fi-stat-row">
+            <div className="sci-fi-stat-icon text-red-400">🚨</div>
+            <div className="sci-fi-stat-info">
+              <div className="sci-fi-stat-label">Open Cases</div>
+              <div className="sci-fi-stat-value text-red-400">{totalOpen.toLocaleString()}</div>
+            </div>
+          </div>
+          <div className="sci-fi-stat-row">
+            <div className="sci-fi-stat-icon text-emerald-400">🏢</div>
+            <div className="sci-fi-stat-info">
+              <div className="sci-fi-stat-label">Active Stations</div>
+              <div className="sci-fi-stat-value text-emerald-400">{totalStations.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="sci-fi-panel" style={{ flex: 1 }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Distribution</span>
+          </div>
+          <div className="flex flex-col gap-3">
+             {topDistricts.map(d => (
+               <div key={d.id} className="flex flex-col gap-1">
+                 <div className="flex justify-between text-[11px] text-gray-300">
+                    <span>{d.name}</span>
+                    <span className="text-blue-400 font-bold">{d.total_firs}</span>
+                 </div>
+                 <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" style={{ width: `${(d.total_firs / (topDistricts[0]?.total_firs || 1)) * 100}%` }}></div>
+                 </div>
+               </div>
+             ))}
+          </div>
         </div>
       </div>
 
-      {/* Live Intelligence Feed Overlay */}
-      <div className="absolute top-20 left-4 w-72 bg-gray-800/80 backdrop-blur-lg border border-gray-700 rounded-xl shadow-2xl z-[400] flex flex-col overflow-hidden max-h-[60vh]">
-        <div className="p-4 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
-            <h3 className="text-sm font-bold text-gray-100 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-              Live Feed
-            </h3>
-            <span className="text-xs text-gray-400">STATEWIDE</span>
+      {/* CENTER COLUMN (MAP) */}
+      <div className="sci-fi-col-center">
+        <div className="sci-fi-header-overlay">
+           <div className="sci-fi-title">Map Data Visualization</div>
         </div>
-        <div className="overflow-y-auto p-3 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-gray-600">
-            {recentActivities.map((act) => (
-              <div key={act.id} 
-                   className="bg-gray-900/60 border border-gray-700/50 rounded-lg p-3 hover:bg-gray-700/40 cursor-pointer transition-colors"
-                   onClick={() => (window as any).__ccDrillToDistrict(act.district_name)}
-              >
-                  <div className="flex justify-between items-start mb-1">
-                      <span className="text-xs font-bold text-indigo-400">{act.crime_type}</span>
-                      <span className="text-[10px] text-gray-500">{new Date(act.incident_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                  </div>
-                  <div className="text-sm text-gray-200 font-medium">{act.district_name} District</div>
-                  <div className="text-xs text-gray-400 mt-1">{act.station_name}</div>
+        <div className="sci-fi-map-container" ref={mapDivRef} />
+        
+        {/* GeoHierarchy Breadcrumb */}
+        <div className="absolute top-24 z-[400] w-full flex justify-center pointer-events-none">
+           <div className="pointer-events-auto">
+             <GeoHierarchy
+               level={level}
+               districts={districts}
+               activeDistrict={activeDistrict}
+               stations={activeStations}
+               onSelectDistrict={drillToDistrict}
+               onSelectStation={(st) => {
+                 setActiveStationId(st.id);
+                 setLevel('station');
+                 setDrawerOpen(true);
+               }}
+               onBack={goBack}
+             />
+           </div>
+        </div>
+        
+        <StationDrawer
+          stationId={activeStationId}
+          open={drawerOpen}
+          onClose={() => {
+            setDrawerOpen(false);
+            setActiveStationId(null);
+          }}
+        />
+      </div>
+
+      {/* RIGHT COLUMN */}
+      <div className="sci-fi-col-right">
+        <div className="sci-fi-panel" style={{ flex: 1 }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Radar Metrics</span>
+          </div>
+          <div className="flex flex-col h-full justify-center gap-2">
+            {radarData.map(item => (
+              <div key={item.label} className="flex justify-between items-center text-xs">
+                 <span className="text-gray-400">{item.label}</span>
+                 <div className="flex-1 mx-3 border-b border-dashed border-gray-700"></div>
+                 <span className="text-emerald-400 font-bold">{item.value}%</span>
               </div>
             ))}
-            {recentActivities.length === 0 && (
-              <div className="text-center text-gray-500 text-xs py-4">No recent activity</div>
-            )}
+          </div>
+        </div>
+
+        <div className="sci-fi-panel" style={{ flex: 1.5 }}>
+          <div className="sci-fi-panel-header">
+            <span className="crosshair">+</span>
+            <span>Live Activity Feed</span>
+          </div>
+          <div className="flex flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-sky-500/50 max-h-[300px]">
+             {recentActivities.map(act => (
+               <div key={act.id} 
+                    className="p-2 border border-sky-500/20 bg-sky-900/10 rounded cursor-pointer hover:bg-sky-500/20 transition-all flex flex-col gap-1"
+                    onClick={() => (window as any).__ccDrillToDistrict(act.district_name)}>
+                 <div className="flex justify-between text-[10px] text-sky-400 uppercase tracking-widest font-bold">
+                    <span>{act.crime_type}</span>
+                    <span className="text-gray-500">{new Date(act.incident_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                 </div>
+                 <div className="text-sm text-gray-200">{act.district_name} District</div>
+                 <div className="text-[10px] text-gray-500 truncate">{act.station_name}</div>
+               </div>
+             ))}
+             {recentActivities.length === 0 && <div className="text-xs text-gray-500 text-center">Awaiting data...</div>}
+          </div>
         </div>
       </div>
+
     </div>
   );
 }
