@@ -139,8 +139,40 @@ def seed_demo_data():
     end_date_2026 = datetime(2026, 7, 20)
     total_days = (end_date_2026 - start_date_2026).days
 
+    # Generate threat weights for each district to vary intensity
+    # Bengaluru Urban, Mysuru, Belagavi, Dharwad, Kalaburagi, Dakshina Kannada are high threat
+    threat_weights = {
+        "Bengaluru Urban": 15.0,
+        "Mysuru": 10.0,
+        "Belagavi": 8.0,
+        "Dharwad": 7.0,
+        "Kalaburagi": 9.5,
+        "Dakshina Kannada": 8.5,
+        "Ballari": 6.0,
+        "Tumakuru": 5.0,
+        "Vijayapura": 5.5,
+        "Bagalkot": 4.5,
+        "Raichur": 4.0,
+        "Shivamogga": 3.5,
+        "Koppal": 3.0,
+        "Yadgir": 2.5,
+        "Bidar": 2.0,
+    }
+    # All other districts default to a lower random weight between 0.3 and 1.5
+    for name in DISTRICTS_DATA.keys():
+        if name not in threat_weights:
+            threat_weights[name] = random.uniform(0.3, 1.5)
+
+    # Compute weights for all stations
+    station_weights = []
+    for s_id, d_id, d_name in station_rows:
+        # Base weight of the district
+        station_weights.append(threat_weights.get(d_name, 1.0))
+
     for fir_num in range(1, 16001):
-        station_id, district_id, district_name = random.choice(station_rows)
+        # Weighted choice of station
+        chosen_station_idx = random.choices(range(len(station_rows)), weights=station_weights, k=1)[0]
+        station_id, district_id, district_name = station_rows[chosen_station_idx]
         crime_type, ipc_sec, desc_template = random.choice(CRIME_TEMPLATES)
         
         # Localities

@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File
 from app.database import get_db_connection
 from typing import Optional
 from app.auth_service import get_current_user
+from app.case_photo_parser import parse_case_photo
+import random
 
 router = APIRouter(tags=["geo"])
 
@@ -333,3 +335,112 @@ def socio_correlation(current_user: dict = Depends(get_current_user)):
             for r in districts
         ]
     }
+
+
+@router.post("/geo/parse-photo")
+async def parse_photo(file: UploadFile = File(...)):
+    """Upload a case record photo to parse its details."""
+    try:
+        content = await file.read()
+        parsed_data = parse_case_photo(content, file.filename)
+        return {"status": "ok", "data": parsed_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse photo: {e}")
+
+
+@router.post("/geo/save-parsed-case")
+def save_parsed_case(data: dict):
+    """Save or update the parsed case record in the database."""
+    conn = get_db_connection()
+    try:
+        district_name = data.get("district_name", "Bengaluru Urban")
+        station_name = data.get("station_name")
+        crime_type = data.get("crime_type", "Cyber Fraud")
+        ipc_section = data.get("ipc_section", "IPC 420")
+        incident_date = data.get("incident_date", "2026-01-01")
+        status = data.get("status", "open")
+        description = data.get("description", "Imported via photo scanner")
+        fir_id = data.get("fir_id")
+
+        # 1. Resolve or create District
+        district = conn.execute(
+            "SELECT id FROM districts WHERE LOWER(name) = ?", (district_name.lower(),)
+        ).fetchone()
+        
+        if not district:
+            # Fallback: create district
+            cursor = conn.execute(
+                "INSERT INTO districts(name, population_density, literacy_rate, unemployment_proxy) VALUES (?, 4000, 0.75, 0.15)",
+                (district_name,)
+            )
+            district_id = cursor.lastrowid
+        else:
+            district_id = district["id"]
+
+        # 2. Resolve or create Station
+        station = None
+        if station_name:
+            station = conn.execute(
+                "SELECT id, latitude, longitude FROM stations WHERE LOWER(name) = ? AND district_id = ?",
+                (station_name.lower(), district_id)
+            ).fetchone()
+            
+        if not station:
+            # Create a station or pick first one in district
+            existing_station = conn.execute(
+                "SELECT id, latitude, longitude FROM stations WHERE district_id = ? LIMIT 1",
+                (district_id,)
+            ).fetchone()
+            
+            if existing_station:
+                station_id = existing_station["id"]
+                slat, slon = existing_station["latitude"], existing_station["longitude"]
+            else:
+                # Default coordinates for Karnataka centroid if everything fails
+                slat, slon = 15.3173 + random.uniform(-0.5, 0.5), 75.7139 + random.uniform(-0.5, 0.5)
+                new_station_name = station_name or f"{district_name} Police Station 1"
+                cursor = conn.execute(
+                    "INSERT INTO stations(district_id, name, beat, latitude, longitude) VALUES (?, ?, 'Beat 1', ?, ?)",
+                    (district_id, new_station_name, slat, slon)
+                )
+                station_id = cursor.lastrowid
+        else:
+            station_id = station["id"]
+            slat, slon = station["latitude"], station["longitude"]
+
+        flat = round(slat + random.uniform(-0.01, 0.01), 5)
+        flon = round(slon + random.uniform(-0.01, 0.01), 5)
+
+        if fir_id:
+            # Update existing
+            conn.execute(
+                """
+                UPDATE fir_records 
+                SET district_id = ?, station_id = ?, crime_type = ?, ipc_section = ?, 
+                    incident_date = ?, status = ?, description = ?
+                WHERE id = ?
+                """,
+                (district_id, station_id, crime_type, ipc_section, incident_date, status, description, fir_id)
+            )
+            action = "updated"
+            record_id = fir_id
+        else:
+            # Create new
+            cursor = conn.execute(
+                """
+                INSERT INTO fir_records(district_id, station_id, crime_type, ipc_section, incident_date, latitude, longitude, status, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (district_id, station_id, crime_type, ipc_section, incident_date, flat, flon, status, description)
+            )
+            action = "created"
+            record_id = cursor.lastrowid
+
+        conn.commit()
+        return {"status": "ok", "action": action, "fir_id": record_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        conn.close()
+
