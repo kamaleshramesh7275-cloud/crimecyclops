@@ -123,6 +123,17 @@ export default function NetworkMap({ nodes, links, onNodeClick }: Props) {
     pathsLayerRef.current = L.layerGroup().addTo(map);
     markersLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
   }, []);
 
   // Render boundaries, markers, and path curves
@@ -208,15 +219,22 @@ export default function NetworkMap({ nodes, links, onNodeClick }: Props) {
       marker.addTo(markersLayerRef.current!);
     });
 
+    // 5. Force Leaflet to recalculate size to prevent grey/unloaded tiles
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 100);
+    }
+
   }, [geoJson, spatialCases, mapConnections]);
 
   return (
-    <div className="network-map-workspace w-full h-full relative" style={{ minHeight: '500px' }}>
+    <div className="network-map-workspace" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       <div className="absolute top-4 left-4 z-[400] bg-slate-950/80 border border-sky-500/30 px-4 py-2 rounded shadow-lg backdrop-blur-md">
         <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Geospatial Link Map</span>
         <p className="text-[9px] text-gray-400 mt-1">Dotted rose lines map active travel trajectories of shared suspects.</p>
       </div>
-      <div ref={mapDivRef} className="w-full h-full" style={{ background: '#020617' }} />
+      <div ref={mapDivRef} style={{ width: '100%', height: '100%', background: '#020617' }} />
     </div>
   );
 }
