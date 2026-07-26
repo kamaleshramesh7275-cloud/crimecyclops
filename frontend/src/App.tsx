@@ -614,19 +614,6 @@ function NetworkPage() {
             onNodeClick={setSelectedNode}
           />
 
-          {/* Legend */}
-          <div className="network-legend">
-            <h4>Node Types</h4>
-            {Object.entries(GROUP_COLORS).map(([group, color]) => (
-              <div key={group} className="legend-item">
-                <div className="legend-dot" style={{ background: color }} />
-                <span style={{ textTransform: 'capitalize' }}>{group}</span>
-              </div>
-            ))}
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(148,163,184,0.1)', fontSize: 11, color: '#64748b' }}>
-              Dashed = co-offender link
-            </div>
-          </div>
         </div>
 
         {/* Sidebar */}
