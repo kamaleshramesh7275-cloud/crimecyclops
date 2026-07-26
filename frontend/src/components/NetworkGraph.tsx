@@ -272,7 +272,7 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
 
         // 3. Node Icon (Inside circle)
         ctx.fillStyle = '#ffffff';
-        ctx.font = \`\${n.radius! * 0.8}px Arial\`;
+        ctx.font = `${n.radius! * 0.8}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(n.node_type === 'FIR' ? '📄' : '👤', n.x!, n.y! + 2); // Slight Y offset for emojis
@@ -292,7 +292,7 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         
         // Badge Icon (first letter of group)
         ctx.fillStyle = '#ffffff';
-        ctx.font = \`bold \${badgeRadius * 1.2}px Inter\`;
+        ctx.font = `bold ${badgeRadius * 1.2}px Inter`;
         ctx.fillText(n.group.charAt(0).toUpperCase(), badgeX, badgeY + 1);
 
         // 5. Pill-shaped Label Underneath
