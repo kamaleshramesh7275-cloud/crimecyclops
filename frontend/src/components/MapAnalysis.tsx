@@ -276,14 +276,6 @@ export default function MapAnalysis() {
   const totalOpen = districts.reduce((acc, d) => acc + d.open_cases, 0);
   const totalStations = districts.reduce((acc, d) => acc + d.station_count, 0);
   
-  const topDistricts = [...districts].sort((a, b) => b.total_firs - a.total_firs).slice(0, 5);
-  const radarData = [
-    { label: 'Theft', value: 34 },
-    { label: 'Cyber', value: 21 },
-    { label: 'Assault', value: 15 },
-    { label: 'Drugs', value: 12 },
-    { label: 'Fraud', value: 18 }
-  ];
 
   // Real data for charts based on districts
   const topDistricts = [...districts].sort((a, b) => b.total_firs - a.total_firs).slice(0, 10);
