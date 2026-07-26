@@ -27,6 +27,9 @@ class SQLiteRowWrapper:
 class postgres_wrapper:
     def __init__(self, conn):
         self.conn = conn
+
+    def cursor(self):
+        return self.conn.cursor()
     
     def execute(self, query, vars=None):
         cur = self.conn.cursor()
