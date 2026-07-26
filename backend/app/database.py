@@ -49,9 +49,6 @@ def init_postgres():
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # 1. Enable PostGIS
-    cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-    
     # 2. Create tables
     cur.execute("""
         CREATE TABLE IF NOT EXISTS districts (
@@ -74,14 +71,6 @@ def init_postgres():
         );
     """)
     
-    # Add geometry column using PostGIS helper if not already present
-    cur.execute("""
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name='stations' AND column_name='geom';
-    """)
-    if not cur.fetchone():
-        cur.execute("SELECT AddGeometryColumn('stations', 'geom', 4326, 'POINT', 2);")
-        
     cur.execute("""
         CREATE TABLE IF NOT EXISTS fir_records (
             id SERIAL PRIMARY KEY,
@@ -97,13 +86,6 @@ def init_postgres():
             data_source VARCHAR(50) DEFAULT 'SYNTHETIC'
         );
     """)
-    
-    cur.execute("""
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name='fir_records' AND column_name='geom';
-    """)
-    if not cur.fetchone():
-        cur.execute("SELECT AddGeometryColumn('fir_records', 'geom', 4326, 'POINT', 2);")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS persons (
@@ -165,9 +147,9 @@ def init_postgres():
         CREATE INDEX IF NOT EXISTS idx_case_links_person ON case_links(person_id);
     """)
     
-    # Create GIST spatial indexes if not exist
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stations_geom ON stations USING GIST(geom);")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_fir_records_geom ON fir_records USING GIST(geom);")
+    # Create spatial indexes if not exist (using standard index on lat/long instead of GIST)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_stations_lat_lon ON stations(latitude, longitude);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_fir_records_lat_lon ON fir_records(latitude, longitude);")
 
     # Insert default admin user if not exists
     cur.execute("SELECT 1 FROM users WHERE username = 'admin';")
