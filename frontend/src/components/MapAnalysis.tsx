@@ -3,7 +3,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import GeoHierarchy from './GeoHierarchy';
 import StationDrawer from './StationDrawer';
 
 // @ts-ignore
@@ -343,22 +342,31 @@ export default function MapAnalysis() {
         </div>
         <div className="sci-fi-map-container" ref={mapDivRef} />
         
-        {/* GeoHierarchy Breadcrumb */}
+        {/* GeoHierarchy Breadcrumb (Sci-Fi Style) */}
         <div className="absolute top-24 z-[400] w-full flex justify-center pointer-events-none">
-           <div className="pointer-events-auto">
-             <GeoHierarchy
-               level={level}
-               districts={districts}
-               activeDistrict={activeDistrict}
-               stations={activeStations}
-               onSelectDistrict={drillToDistrict}
-               onSelectStation={(st) => {
-                 setActiveStationId(st.id);
-                 setLevel('station');
-                 setDrawerOpen(true);
-               }}
-               onBack={goBack}
-             />
+           <div className="pointer-events-auto flex items-center gap-2 bg-gray-900/80 backdrop-blur-md border border-sky-500/30 px-6 py-2 rounded-full shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+             <button 
+                className={`text-sm font-bold uppercase tracking-wider transition-colors ${level === 'state' ? 'text-sky-400 cursor-default' : 'text-gray-400 hover:text-sky-300 cursor-pointer'}`}
+                onClick={() => level !== 'state' && goBack()}
+             >
+               Karnataka
+             </button>
+             {activeDistrict && (
+               <>
+                 <span className="text-sky-500/50">›</span>
+                 <span className="text-sm font-bold uppercase tracking-wider text-sky-400">
+                   {activeDistrict.name}
+                 </span>
+               </>
+             )}
+             {level === 'station' && (
+                <>
+                 <span className="text-sky-500/50">›</span>
+                 <span className="text-sm font-bold uppercase tracking-wider text-sky-400">
+                   Station View
+                 </span>
+               </>
+             )}
            </div>
         </div>
         
