@@ -511,22 +511,16 @@ export default function MapAnalysis() {
         <div className="sci-fi-panel" style={{ flex: '1 1 180px' }}>
           <div className="sci-fi-panel-header">
             <span className="crosshair">+</span>
-            <span>List</span>
+            <span>District Index</span>
           </div>
           <div className="flex flex-col overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-sky-500/50 max-h-[150px]">
-            {[
-              { id: 1, loc: 'New York', country: 'United States' },
-              { id: 2, loc: 'Los Angeles', country: 'United States' },
-              { id: 3, loc: 'Hamburg', country: 'Germany' },
-              { id: 4, loc: 'Berlin', country: 'Germany' },
-              { id: 5, loc: 'Tokyo', country: 'Japan' },
-            ].map(item => (
-              <div key={item.id} className="flex justify-between items-center py-2 border-b border-sky-500/10 text-xs hover:bg-sky-500/10 transition-colors px-2 rounded cursor-pointer">
+            {districts.map(d => (
+              <div key={d.id} className="flex justify-between items-center py-2 border-b border-sky-500/10 text-xs hover:bg-sky-500/10 transition-colors px-2 rounded cursor-pointer" onClick={() => drillToDistrict(d)}>
                  <div className="flex items-center gap-3">
-                   <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></div>
-                   <span className="text-gray-200">{item.loc}</span>
+                   <div className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: getDistrictColor(d.total_firs, Math.max(...districts.map(dx => dx.total_firs))) }}></div>
+                   <span className="text-gray-200">{d.name}</span>
                  </div>
-                 <span className="text-gray-500">{item.country}</span>
+                 <span className="text-gray-500">{d.total_firs} FIRs</span>
                  <span className="text-sky-400 cursor-pointer hover:text-sky-300">View</span>
               </div>
             ))}
