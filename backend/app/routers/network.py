@@ -75,6 +75,8 @@ def graph(current_user: dict = Depends(get_current_user)):
             score = 0.0
             if other_f["crime_type"] == f["crime_type"]:
                 score += 0.4
+                if other_f["district"] == f["district"]:
+                    score += 0.3
             if other_f["instruments"] == f["instruments"] and f["instruments"] != "None":
                 score += 0.3
                 
@@ -85,7 +87,7 @@ def graph(current_user: dict = Depends(get_current_user)):
             if common_words:
                 score += min(0.3, len(common_words) * 0.05)
                 
-            if score >= 0.4:
+            if score >= 0.7:  # High similarity threshold
                 similars.append((other_id, score))
                 
         # Sort by similarity score descending
@@ -146,6 +148,21 @@ def graph(current_user: dict = Depends(get_current_user)):
                         "type": "co_offender",
                     })
                     added_co_offenders.add(edge_tuple)
+
+    # Add FIR-FIR similarity links to graph
+    added_fir_links = set()
+    for f_id, f in firs_dict.items():
+        for similar_id in f["similar_cases"]:
+            edge_tuple = tuple(sorted((f_id, similar_id)))
+            if edge_tuple not in added_fir_links:
+                G.add_edge(f"fir:{f_id}", f"fir:{similar_id}", weight=1)
+                links_raw.append({
+                    "source": f"fir:{f_id}",
+                    "target": f"fir:{similar_id}",
+                    "weight": 1,
+                    "type": "similar_fir",
+                })
+                added_fir_links.add(edge_tuple)
 
     if G.number_of_nodes() == 0:
         return {"nodes": [], "links": [], "stats": {}}
