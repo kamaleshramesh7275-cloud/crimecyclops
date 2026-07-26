@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface GraphNode {
   id: string;
@@ -7,13 +7,8 @@ interface GraphNode {
   node_type: string;
   district: string;
   degree: number;
-  degree_centrality: number;
-  betweenness: number;
-  // Computed tree layout properties
   depth?: number;
   parent?: GraphNode | null;
-  angle?: number;
-  r?: number;
   x?: number;
   y?: number;
   radius?: number;
@@ -23,7 +18,6 @@ interface GraphLink {
   source: string;
   target: string;
   weight: number;
-  type?: string;
 }
 
 interface Props {
@@ -34,33 +28,31 @@ interface Props {
   onNodeClick?: (node: GraphNode) => void;
 }
 
-const GROUP_COLORS: Record<string, string> = {
-  suspect: '#f97316',
-  witness: '#38bdf8',
-  victim: '#fb7185',
-  accused: '#c084fc',
-  complainant: '#34d399',
-  fir: '#6366f1',
-  unknown: '#94a3b8',
+// Colors adapted from the user's screenshot vibe, tuned for our dark theme
+const GROUP_COLORS: Record<string, { main: string, bg: string, text: string }> = {
+  suspect: { main: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', text: '#fdba74' }, // Orange
+  witness: { main: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)', text: '#7dd3fc' }, // Light Blue
+  victim: { main: '#fb7185', bg: 'rgba(251, 113, 133, 0.15)', text: '#fda4af' }, // Rose/Pink
+  accused: { main: '#c084fc', bg: 'rgba(192, 132, 252, 0.15)', text: '#d8b4fe' }, // Purple
+  complainant: { main: '#34d399', bg: 'rgba(52, 211, 153, 0.15)', text: '#6ee7b7' }, // Green
+  fir: { main: '#6366f1', bg: 'rgba(99, 102, 241, 0.15)', text: '#a5b4fc' }, // Indigo
+  unknown: { main: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', text: '#cbd5e1' }, // Slate
 };
 
 export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery, onNodeClick }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Layout state
   const simNodes = useRef<GraphNode[]>([]);
   const simLinks = useRef<Array<{ source: GraphNode; target: GraphNode; weight: number }>>([]);
   const animRef = useRef<number>(0);
-  const maxDepth = useRef<number>(0);
   
-  // Interaction state
-  const transform = useRef({ x: 0, y: 0, k: 1 });
+  const transform = useRef({ x: 0, y: 0, k: 0.6 });
   const isDraggingCanvas = useRef(false);
   const hoveredNode = useRef<GraphNode | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
-  // Resize handler
+  // Handle Resize
   useEffect(() => {
     const handleResize = () => {
       if (!canvasRef.current || !containerRef.current) return;
@@ -73,49 +65,46 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Compute Radial Hierarchy Layout
+  // Compute Bottom-Up Hierarchical Layout
   useEffect(() => {
     if (!nodes.length || !canvasRef.current) return;
     
     const w = canvasRef.current.width || 1200;
     const h = canvasRef.current.height || 800;
-    const cx = w / 2;
-    const cy = h / 2;
 
-    const nodeMap = new Map(nodes.map(n => [n.id, { ...n, radius: n.node_type === 'FIR' ? 12 : Math.min(20, 6 + n.degree * 1.5) }]));
+    const nodeMap = new Map(nodes.map(n => [
+        n.id, 
+        { ...n, radius: n.node_type === 'FIR' ? 18 : Math.min(30, 14 + n.degree * 1.5) }
+    ]));
     
-    // Build adjacency list for BFS
+    // BFS Adjacency
     const adj = new Map<string, string[]>();
     nodes.forEach(n => adj.set(n.id, []));
-    
     links.forEach(l => {
         adj.get(l.source)?.push(l.target);
         adj.get(l.target)?.push(l.source);
     });
 
-    // Find absolute Kingpin (root)
+    // Find Root (Highest Degree)
     let root = nodes[0];
     for (const n of nodes) {
         if (n.degree > root.degree) root = n;
     }
 
-    // BFS to assign depths
     const rootNode = nodeMap.get(root.id)!;
     rootNode.depth = 0;
     rootNode.parent = null;
     
     const queue = [rootNode];
     const visited = new Set([rootNode.id]);
-    
-    let currentMaxDepth = 0;
     const levels: Record<number, GraphNode[]> = {};
+    let maxDepth = 0;
 
     while (queue.length > 0) {
         const curr = queue.shift()!;
         if (!levels[curr.depth!]) levels[curr.depth!] = [];
         levels[curr.depth!].push(curr);
-        
-        currentMaxDepth = Math.max(currentMaxDepth, curr.depth!);
+        maxDepth = Math.max(maxDepth, curr.depth!);
 
         const neighbors = adj.get(curr.id) || [];
         for (const nid of neighbors) {
@@ -129,8 +118,8 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         }
     }
 
-    // Nodes disconnected from the main component get assigned to the outermost ring
-    const disconnectedDepth = currentMaxDepth + 1;
+    // Handle disconnected nodes
+    const disconnectedDepth = maxDepth + 1;
     for (const [id, n] of nodeMap) {
         if (!visited.has(id)) {
             n.depth = disconnectedDepth;
@@ -138,29 +127,30 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
             levels[disconnectedDepth].push(n);
         }
     }
-    
-    maxDepth.current = Math.max(currentMaxDepth, disconnectedDepth);
-    const ringSpacing = 160;
 
-    // Calculate polar coordinates per level
+    // Calculate X, Y coordinates (Bottom-Up Tree)
+    // Root is at the bottom, branches go up
+    const levelHeight = 150;
+    const startY = h - 100; // Bottom offset
+    
     Object.keys(levels).forEach(depthStr => {
         const d = parseInt(depthStr);
         const levelNodes = levels[d];
         
-        // Sort level nodes by parent ID to minimize crossed lines
+        // Sort to prevent crossing lines where possible
         levelNodes.sort((a, b) => (a.parent?.id || "").localeCompare(b.parent?.id || ""));
+        
+        const levelWidth = levelNodes.length * 100; // Spacing between nodes horizontally
+        const startX = (w - levelWidth) / 2 + 50;
         
         levelNodes.forEach((n, i) => {
             if (d === 0) {
-                n.x = cx;
-                n.y = cy;
-                n.r = 0;
-                n.angle = 0;
+                // Root perfectly centered at bottom
+                n.x = w / 2;
+                n.y = startY;
             } else {
-                n.r = d * ringSpacing;
-                n.angle = (i / levelNodes.length) * 2 * Math.PI - Math.PI / 2;
-                n.x = cx + n.r * Math.cos(n.angle);
-                n.y = cy + n.r * Math.sin(n.angle);
+                n.x = startX + (i * 100);
+                n.y = startY - (d * levelHeight);
             }
         });
     });
@@ -173,10 +163,25 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
       return null;
     }).filter(Boolean) as any;
     
-    // Reset transform to center the graph
-    transform.current = { x: 0, y: 0, k: 0.8 };
+    // Auto-center camera on root
+    transform.current = { x: 0, y: 150, k: 0.6 };
 
   }, [nodes, links]);
+
+  // RoundRect Helper for Pill Labels
+  const drawPill = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  };
 
   // Render Loop
   useEffect(() => {
@@ -188,37 +193,23 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
     const render = () => {
       const w = canvas.width;
       const h = canvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
 
-      ctx.fillStyle = '#020617'; // slate-950
+      // Dark background to contrast with bright glowing UI
+      ctx.fillStyle = '#0f172a'; // slate-900
       ctx.fillRect(0, 0, w, h);
       
       ctx.save();
       ctx.translate(transform.current.x, transform.current.y);
       ctx.scale(transform.current.k, transform.current.k);
 
-      // Draw Radar Concentric Rings
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(71, 85, 105, 0.2)'; // slate-600 very dim
-      ctx.setLineDash([5, 15]);
-      for (let i = 1; i <= maxDepth.current; i++) {
-          ctx.beginPath();
-          ctx.arc(cx, cy, i * 160, 0, 2 * Math.PI);
-          ctx.stroke();
-      }
-      ctx.setLineDash([]);
-
-      // Highlight logic (Spotlight tracing)
+      // Connected nodes for highlighting
       const connected = new Set<string>();
       if (hoveredNode.current) {
           connected.add(hoveredNode.current.id);
-          // Highlight direct neighbors
           simLinks.current.forEach(l => {
               if (l.source.id === hoveredNode.current?.id) connected.add(l.target.id);
               if (l.target.id === hoveredNode.current?.id) connected.add(l.source.id);
           });
-          // Trace path up to root
           let p = hoveredNode.current.parent;
           while (p) {
               connected.add(p.id);
@@ -226,43 +217,24 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
           }
       }
 
-      // Draw Links
+      // Draw Links (Clean straight lines like the screenshot)
       simLinks.current.forEach(link => {
         const isHighlighted = hoveredNode.current && connected.has(link.source.id) && connected.has(link.target.id);
         const isFaded = hoveredNode.current && !isHighlighted;
         
         ctx.beginPath();
         ctx.moveTo(link.source.x!, link.source.y!);
+        ctx.lineTo(link.target.x!, link.target.y!);
         
-        // Curved cubic bezier arcs for cooler radar aesthetic
-        if (!isHighlighted) {
-            ctx.lineTo(link.target.x!, link.target.y!);
-        } else {
-            // Curving highlighted paths slightly
-            const controlX = (link.source.x! + link.target.x!) / 2;
-            const controlY = (link.source.y! + link.target.y!) / 2 - 50;
-            ctx.quadraticCurveTo(controlX, controlY, link.target.x!, link.target.y!);
-        }
-        
-        ctx.lineWidth = isHighlighted ? 2.5 : Math.max(0.5, link.weight / 2);
-        
+        ctx.lineWidth = isHighlighted ? 2.5 : 1;
         if (isHighlighted) {
-            ctx.strokeStyle = '#facc15'; // Bright yellow
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#facc15';
+            ctx.strokeStyle = '#facc15';
         } else if (isFaded) {
-            ctx.strokeStyle = 'rgba(71, 85, 105, 0.05)';
-            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.05)';
         } else {
-            // Normal state color code links by source group
-            const sourceColor = GROUP_COLORS[link.source.group.toLowerCase()] || GROUP_COLORS.unknown;
-            ctx.strokeStyle = sourceColor;
-            ctx.globalAlpha = 0.3; // Make lines subtle
-            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
         }
         ctx.stroke();
-        ctx.globalAlpha = 1.0; // Reset alpha
-        ctx.shadowBlur = 0; // Reset shadow
       });
 
       // Draw Nodes
@@ -272,48 +244,89 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         const isHighlighted = hoveredNode.current && connected.has(n.id);
         const isFaded = hoveredNode.current && !connected.has(n.id);
         
+        const colors = GROUP_COLORS[n.group.toLowerCase()] || GROUP_COLORS.unknown;
+        
+        // Skip text rendering for non-highlighted nodes if there are too many (unless it's the root)
+        const shouldShowLabel = !isFaded || n.depth === 0;
+
+        ctx.globalAlpha = isFaded ? 0.2 : 1.0;
+
+        // 1. Outer Concentric Ring
+        ctx.beginPath();
+        ctx.arc(n.x!, n.y!, n.radius! + 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = colors.main;
+        ctx.lineWidth = 1.5;
+        if (isHighlighted || isSelected || isSearched) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = colors.main;
+            ctx.lineWidth = 3;
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // 2. Inner Circle Fill
         ctx.beginPath();
         ctx.arc(n.x!, n.y!, n.radius!, 0, 2 * Math.PI);
-        
-        const baseColor = GROUP_COLORS[n.group.toLowerCase()] || GROUP_COLORS.unknown;
-        ctx.fillStyle = baseColor;
-        
-        if (isFaded) {
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.5)'; // Very dark slate for faded
-            ctx.strokeStyle = 'rgba(71, 85, 105, 0.2)';
-            ctx.lineWidth = 1;
-        } else {
-            if (isHighlighted || isSelected || isSearched) {
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = isHighlighted ? '#facc15' : baseColor;
-                ctx.strokeStyle = isHighlighted ? '#facc15' : baseColor;
-                ctx.lineWidth = 3;
-            } else {
-                ctx.shadowBlur = n.depth === 0 ? 30 : 0; // Root node glows constantly
-                ctx.shadowColor = baseColor;
-                ctx.strokeStyle = '#1e293b';
-                ctx.lineWidth = 1.5;
-            }
-        }
-        
+        ctx.fillStyle = colors.main;
         ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0; // Reset shadow
 
-        // Label rendering
-        if (!isFaded || isHighlighted) {
-            ctx.fillStyle = isHighlighted ? '#ffffff' : '#cbd5e1';
-            ctx.font = isHighlighted ? 'bold 11px Inter, sans-serif' : '500 10px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            const textY = n.y! + n.radius! + (isHighlighted ? 15 : 12);
-            ctx.fillText(n.label.length > 20 ? n.label.substring(0, 17) + '...' : n.label, n.x!, textY);
+        // 3. Node Icon (Inside circle)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = \`\${n.radius! * 0.8}px Arial\`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(n.node_type === 'FIR' ? '📄' : '👤', n.x!, n.y! + 2); // Slight Y offset for emojis
+
+        // 4. Little Top-Right Badge (Like the country flags in screenshot)
+        const badgeRadius = n.radius! * 0.35;
+        const badgeX = n.x! + n.radius! * 0.7;
+        const badgeY = n.y! - n.radius! * 0.7;
+        
+        ctx.beginPath();
+        ctx.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = '#1e293b'; // Dark background for badge
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        
+        // Badge Icon (first letter of group)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = \`bold \${badgeRadius * 1.2}px Inter\`;
+        ctx.fillText(n.group.charAt(0).toUpperCase(), badgeX, badgeY + 1);
+
+        // 5. Pill-shaped Label Underneath
+        if (shouldShowLabel) {
+            const labelText = n.label.length > 15 ? n.label.substring(0, 13) + '..' : n.label;
+            ctx.font = '600 12px Inter, sans-serif';
             
-            // Draw root badge
-            if (n.depth === 0) {
-                ctx.fillStyle = '#fef08a'; // yellow-200
-                ctx.fillText("KINGPIN", n.x!, n.y! - n.radius! - 8);
-            }
+            const textMetrics = ctx.measureText(labelText);
+            const textWidth = textMetrics.width;
+            const paddingX = 10;
+            const paddingY = 4;
+            const pillWidth = textWidth + paddingX * 2;
+            const pillHeight = 20;
+            
+            const pillX = n.x! - pillWidth / 2;
+            const pillY = n.y! + n.radius! + 10;
+
+            // Pill Background
+            drawPill(ctx, pillX, pillY, pillWidth, pillHeight, 10);
+            ctx.fillStyle = colors.bg;
+            ctx.fill();
+            
+            // Pill Border
+            ctx.strokeStyle = colors.main;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Pill Text
+            ctx.fillStyle = colors.text;
+            ctx.textBaseline = 'top';
+            ctx.fillText(labelText, n.x!, pillY + paddingY);
         }
+        
+        ctx.globalAlpha = 1.0; // Reset
       });
       
       ctx.restore();
@@ -325,22 +338,16 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
   }, [searchQuery, selectedNodeId]);
 
   // Input Handling
-  const getMousePos = (e: React.MouseEvent | MouseEvent) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left - transform.current.x) / transform.current.k,
-      y: (e.clientY - rect.top - transform.current.y) / transform.current.k
-    };
-  };
-
   const handleMouseDown = (e: React.MouseEvent) => {
     isDraggingCanvas.current = true;
     lastMousePos.current = { x: e.clientX, y: e.clientY };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    const pos = getMousePos(e);
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left - transform.current.x) / transform.current.k;
+    const mouseY = (e.clientY - rect.top - transform.current.y) / transform.current.k;
     
     if (isDraggingCanvas.current) {
       transform.current.x += e.clientX - lastMousePos.current.x;
@@ -348,9 +355,11 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } else {
       let hovered: GraphNode | null = null;
-      for (const n of simNodes.current) {
-        const dx = pos.x - n.x!;
-        const dy = pos.y - n.y!;
+      // Search in reverse to catch top-most nodes first
+      for (let i = simNodes.current.length - 1; i >= 0; i--) {
+        const n = simNodes.current[i];
+        const dx = mouseX - n.x!;
+        const dy = mouseY - n.y!;
         if (dx * dx + dy * dy <= n.radius! * n.radius!) {
           hovered = n;
           break;
@@ -363,7 +372,6 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
   const handleMouseUp = (e: React.MouseEvent) => {
     isDraggingCanvas.current = false;
     if (hoveredNode.current && onNodeClick) {
-        // Quick check for click vs drag (simplified)
         onNodeClick(hoveredNode.current);
     }
   };
@@ -384,7 +392,7 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[600px] bg-slate-950 overflow-hidden">
+    <div ref={containerRef} className="relative w-full h-full min-h-[600px] bg-slate-900 overflow-hidden">
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
@@ -394,27 +402,21 @@ export default function NetworkGraph({ nodes, links, selectedNodeId, searchQuery
         onWheel={handleWheel}
         className="block w-full h-full cursor-grab active:cursor-grabbing"
       />
-      
-      {/* Target Crosshair Overlay (subtle visual effect) */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10">
-          <div className="w-[1px] h-full bg-cyan-400"></div>
-          <div className="h-[1px] w-full bg-cyan-400 absolute"></div>
-      </div>
 
-      {/* Legend & Instructions */}
-      <div className="absolute top-4 left-4 bg-slate-900/90 p-4 rounded-xl border border-slate-800 backdrop-blur-md pointer-events-none shadow-xl">
-          <div className="text-sm font-bold text-slate-100 mb-3 tracking-wide">RADIAL NETWORK LEGEND</div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-            {Object.entries(GROUP_COLORS).map(([role, color]) => (
+      <div className="absolute top-4 left-4 bg-slate-900/90 p-4 rounded-xl border border-slate-700 backdrop-blur-md pointer-events-none shadow-xl">
+          <div className="text-sm font-bold text-slate-100 mb-3 tracking-wide">HIERARCHY LEGEND</div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {Object.entries(GROUP_COLORS).map(([role, colors]) => (
                 <div key={role} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: color }}></div>
+                    <div className="relative w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: colors.main }}>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white bg-slate-800"></div>
+                    </div>
                     <span className="text-xs font-medium text-slate-300 capitalize">{role}</span>
                 </div>
             ))}
           </div>
           <div className="text-[10px] text-slate-500 mt-4 uppercase tracking-wider font-semibold">
-              Center: Kingpin • Outer: Associates<br/>
-              Scroll to Zoom • Drag to Pan
+              Root at bottom • Branches upwards
           </div>
       </div>
     </div>
