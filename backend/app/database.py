@@ -24,13 +24,51 @@ class SQLiteRowWrapper:
         return self._row.keys()
 
 
+class postgres_wrapper:
+    def __init__(self, conn):
+        self.conn = conn
+    
+    def execute(self, query, vars=None):
+        cur = self.conn.cursor()
+        cur.execute(query, vars)
+        return cur
+        
+    def executemany(self, query, vars_list):
+        cur = self.conn.cursor()
+        cur.executemany(query, vars_list)
+        return cur
+        
+    def executescript(self, script):
+        cur = self.conn.cursor()
+        cur.execute(script)
+        return cur
+        
+    def commit(self):
+        self.conn.commit()
+        
+    def rollback(self):
+        self.conn.rollback()
+        
+    def close(self):
+        self.conn.close()
+        
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.commit()
+        else:
+            self.rollback()
+        self.close()
+
 def get_db_connection():
     if DATABASE_URL and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")):
         import psycopg2
         import psycopg2.extras
         # Return connection with RealDictCursor for compatibility with dict-like row access
         conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-        return conn
+        return postgres_wrapper(conn)
     else:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
